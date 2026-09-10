@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LCNAF2Wiki (prototype)",
+  "name": "LCNAF2Wiki",
   "version": "0.1.0",
   "description": "Extracts MARC 100, 400 and 374 fields from LCNAF authority records.",
   "permissions": ["activeTab"],

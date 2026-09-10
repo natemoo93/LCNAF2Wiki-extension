@@ -19,7 +19,7 @@ import { newItemUrl } from '../core/newitem.js';
  * constant. Thus you can set the correct destination with a change to one
  * line. The destination can be a LibGuide, a wiki page or a contact form.
  */
-const DOCS_URL = 'https://github.com/nulib/LCNAF2Wiki';
+const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
 
 const form = document.getElementById('lookup');
 const input = document.getElementById('id');

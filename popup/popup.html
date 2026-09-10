@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LCNAF2Wiki</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>LCNAF2Wiki</h1>
+      <p class="sub">LCNAF &rarr; Wikidata</p>
+    </header>
+
+    <form id="lookup">
+      <label class="sr-only" for="id">LCNAF identifier</label>
+      <input
+        id="id"
+        name="id"
+        type="text"
+        placeholder="n50044114"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button type="submit" id="go">Fetch</button>
+    </form>
+
+    <p id="hint" class="hint" hidden></p>
+
+    <main id="out" aria-live="polite"></main>
+
+    <footer>
+      <a id="docs" href="#" target="_blank" rel="noreferrer">Documentation &amp; feedback</a>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

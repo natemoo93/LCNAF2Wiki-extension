@@ -1,4 +1,4 @@
-# LCNAF2Wiki browser extension
+# LCNAF2Wiki Browser Extension
 
 Turns an LCNAF authority record into the fields needed to create a Wikidata
 item: **Label**, **Description**, **Aliases**, and language. Each field is

@@ -1,0 +1,119 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #61656e;
+  --line: #e2e4e9;
+  --accent: #4e2a84; /* Northwestern purple */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1e22;
+    --fg: #e8eaed;
+    --muted: #9aa0aa;
+    --line: #33363d;
+    --accent: #b492e0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 100%;
+  min-width: 320px;
+  max-width: 620px;
+  margin: 0;
+  padding: 18px;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    13px/1.5 system-ui,
+    -apple-system,
+    Segoe UI,
+    sans-serif;
+}
+
+header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.group {
+  margin-top: 18px;
+}
+
+.group h2 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.setting:hover {
+  border-color: var(--accent);
+}
+
+.setting:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.setting input {
+  flex: none;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.setting-text {
+  display: block;
+}
+
+.setting-name {
+  display: block;
+  font-weight: 600;
+}
+
+.setting-note {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+footer {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+footer a {
+  color: var(--muted);
+  font-size: 11px;
+}

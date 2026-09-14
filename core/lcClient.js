@@ -1,16 +1,13 @@
 /**
- * Library of Congress fetch client.
- *
- * The prototype gets one record at a time. It has no queue, no concurrency
- * control, and no cache. Batch mode needs those functions. This module does
- * not have them.
+ * Library of Congress fetch client, one record at a time.
+ * No queue, no concurrency control, no cache. Batch mode would need those.
  */
 
 import { normalizeId } from './extract.js';
 
 const BASE = 'https://id.loc.gov/authorities/names/';
 
-/** Identifies the extension to LC and gives a contact for unusual conditions. */
+/** Identifies the extension to LC, with a contact. */
 export const USER_AGENT = 'LCNAF2Wiki-prototype/0.1 (Northwestern University Library)';
 
 /**
@@ -35,11 +32,9 @@ export async function fetchRecord(rawId, opts = {}) {
       redirect: 'follow',
     });
   } catch (cause) {
-    // This condition includes no network, a DNS failure, and a CORS
-    // rejection. The host_permissions setting prevents a CORS rejection. But
-    // if the manifest is incorrect, a clear message is better than "Failed to
-    // fetch".
-    throw taggedError(`Could not reach id.loc.gov — ${cause.message}`, 'network');
+    // Covers no network, DNS failure and CORS rejection. A clear message
+    // beats "Failed to fetch" if host_permissions is ever wrong.
+    throw taggedError(`Could not reach id.loc.gov. ${cause.message}`, 'network');
   }
 
   if (res.status === 404) {

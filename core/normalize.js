@@ -1,13 +1,6 @@
 /**
- * Occupation terms into Wikidata descriptions.
- *
- * The MARC 374 field has LCSH occupation terms. Those terms are plural and
- * start with a capital letter ("Sociologists"). Wikidata descriptions are
- * singular and lowercase. They have no period at the end ("sociologist").
- *
- * The singulariser is a table of rules with a list of exceptions. It is not a
- * general stemmer. The vocabulary is small. A stemmer fails without a message
- * and gives incorrect results ("physics" becomes "physic").
+ * LCSH occupation terms into Wikidata style: "Sociologists" to "sociologist".
+ * The singulariser is a rules table, not a stemmer, because the list is small.
  */
 
 /** Plurals that do not end with -s. */
@@ -20,8 +13,7 @@ const IRREGULAR = {
 };
 
 /**
- * Words that end with -s and are already singular, or that have no singular
- * form in this context. Without this list, "personnel" stays correct, but
+ * Words that end with -s and are already singular. Without this list,
  * "physics" becomes "physic" and "news" becomes "new".
  */
 const INVARIANT = new Set([
@@ -46,8 +38,7 @@ const INVARIANT = new Set([
  * @returns {string}
  */
 function singularizeWord(word) {
-  // Do not include the punctuation at the end (")", ",") in the
-  // morphology.
+  // Keep the punctuation at the end out of the morphology.
   const bare = word.replace(/[^\p{L}\p{M}'-]+$/u, '');
   const tail = word.slice(bare.length);
   const lower = bare.toLowerCase();
@@ -55,8 +46,7 @@ function singularizeWord(word) {
   if (IRREGULAR[lower]) return IRREGULAR[lower] + tail;
   if (INVARIANT.has(lower)) return bare + tail;
 
-  // The endings "-ss" (actress), "-us" (census) and "-is" (analysis) are not
-  // plural markers.
+  // "-ss" (actress), "-us" (census) and "-is" (analysis) are not plural.
   if (/(ss|us|is)$/i.test(bare)) return bare + tail;
 
   if (/ies$/i.test(bare)) return bare.slice(0, -3) + 'y' + tail;
@@ -67,10 +57,8 @@ function singularizeWord(word) {
 }
 
 /**
- * Make the head noun of each coordinated phrase singular.
- *
- * "Motion picture producers and directors" has two head nouns and not one. If
- * you change only the last word, "producers" stays plural.
+ * Make the head noun of each coordinated phrase singular. "Motion picture
+ * producers and directors" has two head nouns, not one.
  *
  * @param {string} phrase
  * @returns {string}
@@ -95,12 +83,8 @@ function singularizePhrase(phrase) {
 }
 
 /**
- * Change one LCSH occupation term to the Wikidata description style.
- *
- * Keep the structure. Do not write it again. LCSH subdivisions ("--") and
- * qualifiers in parentheses stay. To interpret them, you must estimate the
- * LCSH semantics. The `isAwkwardTerm` function identifies the terms that a
- * person must examine.
+ * Change one LCSH occupation term to Wikidata style. Subdivisions ("--") and
+ * qualifiers stay, because interpreting them needs LCSH semantics.
  *
  * @param {string} raw e.g. "Deans (Education)"
  * @returns {string} e.g. "dean (education)"
@@ -127,8 +111,7 @@ export function normalizeOccupation(raw) {
 }
 
 /**
- * True when a term keeps the LCSH syntax. The cataloguer can then write the
- * term again manually.
+ * True when a term keeps LCSH syntax a cataloguer may want to rewrite.
  * @param {string} raw
  * @returns {boolean}
  */
@@ -137,10 +120,7 @@ export function isAwkwardTerm(raw) {
 }
 
 /**
- * Build a description from the occupation terms.
- *
- * The Wikidata style is: lowercase, commas between the terms, and no period at
- * the end.
+ * Build a description from the occupation terms: lowercase, comma-separated.
  *
  * @param {string[]} terms
  * @returns {string}
@@ -151,7 +131,7 @@ export function describeFromOccupations(terms) {
 
   for (const t of terms ?? []) {
     const n = normalizeOccupation(t);
-    // A record can give the same occupation in more than one 374 field.
+    // The same occupation can occur in more than one 374 field.
     if (n && !seen.has(n)) {
       seen.add(n);
       out.push(n);

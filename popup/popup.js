@@ -1,10 +1,6 @@
 /**
- * Popup controller.
- *
- * Each MARC tag shows as a chip with a colour code. Green is present. Grey is
- * absent. Red needs attention. Put the pointer on a chip or give the chip the
- * focus to show its detail. Click the chip to keep the detail open. You can
- * then read the detail and copy it.
+ * Popup controller. Each MARC tag shows as a colour-coded chip.
+ * Hover or focus previews the detail; a click pins it open.
  */
 
 import { fetchRecord } from '../core/lcClient.js';
@@ -13,21 +9,19 @@ import { extractFields, idFromUrl, normalizeId } from '../core/extract.js';
 import { mapRecord } from '../core/mapper.js';
 import { toQuickStatements } from '../core/quickstatements.js';
 import { newItemUrl } from '../core/newitem.js';
+import { findDuplicates } from '../core/wikidata.js';
+import { getSettings } from '../core/settings.js';
 
-/**
- * The destination of the "communicate with the project team" link. This is one
- * constant. Thus you can set the correct destination with a change to one
- * line. The destination can be a LibGuide, a wiki page or a contact form.
- */
+/** Where the documentation link points. One constant, so it is one change. */
 const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
 
 const form = document.getElementById('lookup');
 const input = document.getElementById('id');
 const button = document.getElementById('go');
-const hint = document.getElementById('hint');
 const out = document.getElementById('out');
+const optionsButton = document.getElementById('open-options');
 
-/** Stops a fetch that is in operation when a second lookup starts. */
+/** Stops the fetch in operation when a second lookup starts. */
 let inFlight = null;
 
 init();
@@ -36,21 +30,24 @@ async function init() {
   input.focus();
   document.getElementById('docs').href = DOCS_URL;
 
-  // If the user opened the popup on an LC authority page, fill in the
-  // identifier from the URL and do the lookup immediately. Thus the usual
-  // single-record task needs no keyboard input.
+  // The settings are on their own page in the extension manager. This button
+  // opens that page.
+  optionsButton.addEventListener('click', () => {
+    if (globalThis.chrome?.runtime?.openOptionsPage) chrome.runtime.openOptionsPage();
+  });
+
+  // On an LC authority page, take the identifier from the URL and look it
+  // up at once, so the usual task needs no keyboard input.
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const id = tab?.url ? idFromUrl(tab.url) : undefined;
     if (id) {
       input.value = id;
-      showHint(`Detected ${id} on the current page.`);
       lookup(id);
     }
   } catch {
-    // The chrome.tabs API can be unavailable. Example: the user opened the
-    // popup as a usual page. This is not a serious failure. The user can type
-    // an identifier.
+    // chrome.tabs is unavailable when the popup opens as a usual page.
+    // The user can still type an identifier.
   }
 }
 
@@ -61,10 +58,8 @@ form.addEventListener('submit', (e) => {
     input.focus();
     return;
   }
-  // Show the normalized value. Thus the user sees that "n  8305" became
-  // "n8305".
+  // Show the normalized value, so the user sees what changed.
   input.value = id;
-  hideHint();
   lookup(id);
 });
 
@@ -81,11 +76,12 @@ async function lookup(id) {
   renderLoading(id);
 
   try {
-    const { xml, url } = await fetchRecord(id, { signal: ctl.signal });
+    const { xml } = await fetchRecord(id, { signal: ctl.signal });
     if (ctl.signal.aborted) return;
 
     const rec = parseMarcXml(xml, id);
-    renderRecord(extractFields(rec), mapRecord(rec), url);
+    const settings = await getSettings();
+    renderRecord(extractFields(rec), mapRecord(rec), settings);
   } catch (err) {
     if (ctl.signal.aborted || err.name === 'AbortError') return;
     renderError(err);
@@ -106,26 +102,21 @@ function renderLoading(id) {
 /**
  * @param {ReturnType<typeof extractFields>} record
  * @param {ReturnType<typeof mapRecord>} draft
- * @param {string} url
+ * @param {typeof import('../core/settings.js').DEFAULTS} settings
  */
-function renderRecord(record, draft, url) {
+function renderRecord(record, draft, settings) {
   const frag = document.createDocumentFragment();
 
   const head = el('div', { class: 'record-head' });
-  head.append(
-    el('div', { class: 'name' }, record.heading ?? '(no 100 $a heading)'),
-    el('div', { class: 'id' }, record.id),
-  );
+  head.append(el('div', { class: 'name' }, record.heading ?? '(no 100 $a heading)'));
   frag.append(head);
 
-  // Show the derived fields first. They are the function of the tool. The
-  // MARC chips below are the data that supports them.
-  const draftPanel = renderDraft(draft);
+  // The derived fields come first. The chips below are the evidence.
+  const draftPanel = renderDraft(draft, settings);
   frag.append(draftPanel);
 
-  // Show one row of chips. Show one detail panel below the row. Keep the
-  // detail in one location. Do not make the chips larger in the row. Thus the
-  // row of chips does not move when the user moves the pointer across it.
+  // One row of chips, one shared detail panel below. Keeping the detail in
+  // one place stops the chip row from reflowing.
   const row = el('div', { class: 'chips', role: 'list' });
   const detail = el('div', { class: 'detail', id: 'detail' });
 
@@ -137,42 +128,28 @@ function renderRecord(record, draft, url) {
 
   frag.append(row, detail);
 
-  const raw = el('details', { class: 'raw' });
-  raw.append(el('summary', {}, 'Raw MARCXML'), el('pre', {}, record.source));
-  frag.append(raw);
-
-  const link = el('p', { class: 'hint' });
-  link.append(el('a', { href: url, target: '_blank', rel: 'noreferrer' }, url));
-  frag.append(link);
-
   out.replaceChildren(frag);
 
-  // The fields are now in the document. Thus you can measure them and make
-  // them large enough for their contents.
+  // The fields are in the document now, so they can be measured.
   draftPanel._sizeFields?.();
 
-  // Open the most important group. Thus the record shows its condition and
-  // the user does not have to find the chip with the flag. Red has priority
-  // over blue. Blue has priority over green.
+  // Open the most significant group, so the record explains itself.
+  // Red outranks blue, which outranks green.
   const rank = ['attention', 'notable', 'present'];
   const opener = rank.map((s) => record.groups.find((g) => g.status === s)).find(Boolean);
   controller.pin(opener);
 }
 
 /**
- * The derived Wikidata fields. The user can edit them and copy them.
- *
- * The DOM holds the values. There is no separate model. Each field is a
- * textarea. Thus the copy buttons read the same text that the cataloguer
- * edits.
+ * The derived Wikidata fields, editable and copyable. The DOM holds the
+ * values, so the copy buttons read exactly what the cataloguer edits.
  *
  * @param {ReturnType<typeof mapRecord>} draft
  */
-function renderDraft(draft) {
+function renderDraft(draft, settings = {}) {
   const wrap = el('section', { class: 'draft' });
 
-  // Show a warning that applies to one field next to that field. Show all
-  // other warnings at the top of the panel.
+  // A warning for one field goes next to it; the rest go at the top.
   const byField = {
     label: draft.warnings.filter((w) => w.code === 'label-uncertain' || w.code === 'multiple-100'),
     aliases: draft.warnings.filter((w) => w.code === 'alias-uncertain'),
@@ -186,7 +163,7 @@ function renderDraft(draft) {
 
   const fields = [
     { key: 'label', name: 'Label', value: draft.label },
-    { key: 'description', name: 'Description', value: draft.description, hint: descriptionHint(draft) },
+    { key: 'description', name: 'Description', value: draft.description },
     { key: 'aliases', name: 'Aliases', value: draft.aliases.join('|') },
   ];
 
@@ -197,37 +174,78 @@ function renderDraft(draft) {
     wrap.append(row);
   }
 
-  // Set the size only after the panel is in the document. A textarea that is
-  // not in the document gives a scrollHeight of 0. That value makes each field
-  // a thin strip.
+  // Size the fields only once the panel is in the document. A detached
+  // textarea reports scrollHeight 0.
   wrap._sizeFields = () => Object.values(inputs).forEach(autoGrow);
 
-  // The language is constant at this time. The user cannot edit it. Show the
-  // language. Thus the default is visible.
-  wrap.append(
-    el(
-      'div',
-      { class: 'draft-row draft-lang' },
-      el('span', { class: 'draft-name' }, 'Language'),
-      el('span', { class: 'draft-static' }, draft.lang),
-    ),
+  const actions = el('div', { class: 'draft-actions' });
+
+  // Build the URL at click time, so it includes the edits.
+  const create = linkButton(
+    'Create in Wikidata',
+    () => newItemUrl(currentDraft(draft, inputs)),
+    'primary',
   );
 
-  const actions = el('div', { class: 'draft-actions' });
   actions.append(
-    // Build the URL when the user clicks. Thus the URL includes the edits
-    // that the user made in the fields.
-    linkButton('Create in Wikidata', () => newItemUrl(currentDraft(draft, inputs)), 'primary'),
+    create,
     copyButton('Copy all', () => allFieldsText(draft, inputs)),
     copyButton('QuickStatements', () => toQuickStatements(currentDraft(draft, inputs))),
   );
   wrap.append(actions);
 
+  // The check needs the setting on and an identifier to search for.
+  if (settings.checkDuplicates && draft.lcnafId) {
+    guardCreate(create, draft.lcnafId);
+  }
+
   return wrap;
 }
 
 /**
- * One field with a label. The user can edit the field and copy it.
+ * Lock the create button until the duplicate check is complete. A duplicate
+ * makes it grey; a click restores it. Refer to the README for the fail-open
+ * rule.
+ *
+ * @param {HTMLButtonElement} button
+ * @param {string} lcnafId
+ */
+async function guardCreate(button, lcnafId) {
+  const label = button.textContent;
+  button.disabled = true;
+
+  const result = await findDuplicates(lcnafId);
+
+  // No duplicate, or a check that did not complete. Fail open.
+  if (result.status !== 'duplicate') {
+    button.disabled = false;
+    return;
+  }
+
+  // A duplicate. The title names the item that the search found.
+  const found = result.items.map((i) => i.id).join(', ');
+  button.disabled = false;
+  button.textContent = 'Entry exists';
+  button.className = 'copy copy-exists';
+  button.title = found
+    ? `Already in Wikidata as ${found} (P244 ${lcnafId}). Click to create one more item.`
+    : `Already in Wikidata (P244 ${lcnafId}). Click to create one more item.`;
+
+  // Capture phase and stopImmediatePropagation keep this before the handler
+  // that opens Wikidata, so the first click only resets.
+  const reset = (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    button.removeEventListener('click', reset, true);
+    button.textContent = label;
+    button.className = 'copy copy-primary';
+    button.removeAttribute('title');
+  };
+  button.addEventListener('click', reset, true);
+}
+
+/**
+ * One labelled field, editable and copyable.
  * @param {{key: string, name: string, value: string, hint?: string}} spec
  * @param {{detail?: string, code: string}[]} warnings
  */
@@ -242,8 +260,7 @@ function draftRow(spec, warnings) {
 
   const line = el('div', { class: 'draft-line' });
 
-  // Use a textarea and not an input. Aliases and long names go to the next
-  // line. The field becomes larger. It does not scroll to the side.
+  // A textarea, not an input: long names wrap instead of scrolling sideways.
   const field = el('textarea', {
     class: flagged ? 'draft-field is-flagged' : 'draft-field',
     rows: '1',
@@ -260,26 +277,12 @@ function draftRow(spec, warnings) {
     row.append(el('p', { class: 'draft-warn' }, w.detail ?? w.code));
   }
 
-  if (!spec.value) {
-    row.append(el('p', { class: 'draft-empty' }, 'Nothing derived — add a value or leave blank.'));
-  }
-
   return { row, field };
 }
 
-/** The source of the description. It gives the reason for an unusual value. */
-function descriptionHint(draft) {
-  if (draft.descriptionSource === 'dates') return `from dates (${draft.dateSource})`;
-  if (draft.descriptionSource === 'occupation') return 'from 374';
-  return undefined;
-}
-
 /**
- * A button that opens a URL in a new tab. The code builds the URL when the
- * user clicks.
- *
- * Special:NewItem only fills in the form. The cataloguer then examines the
- * form and pushes Create. Thus this button opens a tab. It writes no data.
+ * A button that opens a URL in a new tab, built at click time.
+ * Special:NewItem only prefills the form, so this writes no data.
  *
  * @param {string} label
  * @param {() => string} getUrl
@@ -294,8 +297,7 @@ function linkButton(label, getUrl, variant) {
 
   btn.addEventListener('click', () => {
     const url = getUrl();
-    // The chrome.tabs API is unavailable when the user opens the popup as a
-    // usual page.
+    // chrome.tabs is unavailable when the popup opens as a usual page.
     if (globalThis.chrome?.tabs?.create) chrome.tabs.create({ url });
     else window.open(url, '_blank', 'noreferrer');
   });
@@ -304,8 +306,7 @@ function linkButton(label, getUrl, variant) {
 }
 
 /**
- * A copy button. It reads its value when the user clicks. Thus it includes the
- * edits.
+ * A copy button that reads its value at click time, so edits are respected.
  * @param {string} label
  * @param {() => string} getValue
  * @param {string} [variant]
@@ -324,7 +325,7 @@ function copyButton(label, getValue, variant) {
       await navigator.clipboard.writeText(text);
       flash(btn, 'Copied');
     } catch {
-      // The clipboard can be unavailable. The user can select the text.
+      // The clipboard can be blocked. Selecting the text still works.
       flash(btn, 'Press Ctrl+C');
     }
   });
@@ -332,7 +333,7 @@ function copyButton(label, getValue, variant) {
   return btn;
 }
 
-/** Change the label of a button for a short time to confirm the copy. */
+/** Briefly change a button label to confirm the copy. */
 function flash(btn, message) {
   const original = btn.textContent;
   btn.textContent = message;
@@ -369,12 +370,8 @@ function allFieldsText(draft, inputs) {
 }
 
 /**
- * Make a textarea large enough for its contents. Thus a scrollbar hides no
- * text.
- *
- * This function operates only when the element is in the document. The
- * scrollHeight is 0 when the element is not in the document. The CSS
- * min-height property keeps the field usable in the two conditions.
+ * Grow a textarea to fit its content. Only meaningful once the element is in
+ * the document, because a detached one reports scrollHeight 0.
  */
 function autoGrow(field) {
   field.style.height = 'auto';
@@ -382,8 +379,7 @@ function autoGrow(field) {
 }
 
 /**
- * The open, preview and pin state of the detail panel. The chips use this
- * state together.
+ * Shared open, preview and pin state for the detail panel.
  * @param {HTMLElement} host
  */
 function detailController(host) {
@@ -402,11 +398,11 @@ function detailController(host) {
 
   return {
     register: (group, node) => chips.set(group, node),
-    /** Pointer or focus on a chip. Show the group. Do not change the pin. */
+    /** Hover or focus: show without changing the pin. */
     preview: (group) => paint(group),
-    /** Pointer off the chip or focus lost. Show the pinned group. */
+    /** Pointer left or blur: fall back to the pinned group. */
     release: () => paint(pinned),
-    /** Click. Pin this group. If the group is pinned, release the pin. */
+    /** Click: pin this group, or unpin it if already pinned. */
     pin: (group) => {
       pinned = pinned === group ? null : (group ?? null);
       paint(pinned);
@@ -430,18 +426,16 @@ function chip(group, controller) {
       role: 'listitem',
       'aria-expanded': 'false',
       'aria-controls': 'detail',
-      // A tooltip from the browser for a user who does not click.
-      title: `${group.tag} — ${group.name}`,
+      // A browser tooltip, for anyone who never clicks.
+      title: `${group.tag}: ${group.name}`,
     },
     el('span', { class: 'chip-tag' }, group.tag),
   );
 
-  // The count is the primary data. "400 x3" gives more data than a green
-  // dot.
+  // The count is the at-a-glance payload.
   if (count > 1) node.append(el('span', { class: 'chip-count' }, `×${count}`));
 
-  // Show a symbol and a colour. Thus the user can identify the three
-  // "present" states without the colour.
+  // A glyph as well as a colour, so the states stay distinct without hue.
   const mark = { attention: '!', notable: 'i' }[group.status];
   if (mark) node.append(el('span', { class: 'chip-mark' }, mark));
 
@@ -507,18 +501,9 @@ function setBusy(busy) {
   button.textContent = busy ? 'Fetching…' : 'Fetch';
 }
 
-function showHint(text) {
-  hint.textContent = text;
-  hint.hidden = false;
-}
-
-function hideHint() {
-  hint.hidden = true;
-}
-
 /**
- * A minimal element builder. Give the text as children and add it with the
- * append method. Do not use innerHTML. The record data is not trusted input.
+ * A minimal element builder. Text is appended, never set via innerHTML,
+ * because record data is untrusted.
  * @param {string} tag
  * @param {Record<string, string>} attrs
  * @param {...(string | Node)} children

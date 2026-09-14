@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>LCNAF2Wiki settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <header>
+      <h1>LCNAF2Wiki settings</h1>
+      <p class="sub">LCNAF &rarr; Wikidata</p>
+    </header>
+
+    <main>
+      <section class="group">
+        <h2>Before creating an item</h2>
+
+        <label class="setting">
+          <input type="checkbox" id="check-duplicates" />
+          <span class="setting-text">
+            <span class="setting-name">Check for duplicates first</span>
+            <span class="setting-note">
+              Before unlocking <strong>Create in Wikidata</strong>, search Wikidata for an
+              item that already carries this LCNAF id in P244. An exact P244 match is
+              proof of a duplicate; a name match is not.
+            </span>
+            <span class="setting-note">
+              If Wikidata cannot be reached or rate-limits the request, the button
+              unlocks with a note to check by hand. A failed lookup is not evidence that
+              no item exists.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section class="group">
+        <h2>Toolbar icon click</h2>
+
+        <label class="setting">
+          <input type="radio" name="click-action" value="menu" />
+          <span class="setting-text">
+            <span class="setting-name">Open the full menu</span>
+            <span class="setting-note">
+              Show the popup, so the MARC chips and the derived fields can be reviewed
+              and edited before anything reaches Wikidata.
+            </span>
+          </span>
+        </label>
+
+        <label class="setting">
+          <input type="radio" name="click-action" value="create" />
+          <span class="setting-text">
+            <span class="setting-name">Create in Wikidata instantly</span>
+            <span class="setting-note">
+              Skip the popup and open the prefilled <strong>Special:NewItem</strong>
+              form, to proofread the fields on Wikidata's own page. Nothing is saved
+              until Create is pressed there.
+            </span>
+            <span class="setting-note">
+              The popup opens instead when there is no LCNAF id in the page address, when
+              the record yields no label, when the duplicate check finds an item, or when
+              the fetch fails.
+            </span>
+          </span>
+        </label>
+      </section>
+    </main>
+
+    <footer>
+      <a id="docs" href="#" target="_blank" rel="noreferrer">Documentation &amp; feedback</a>
+    </footer>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

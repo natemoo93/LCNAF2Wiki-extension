@@ -1,23 +1,14 @@
 /**
- * MARC record to Wikidata draft.
- *
- * This module is pure. It takes a parsed record and gives a draft. It does no
- * input or output. The object that it returns has all the data that a
- * cataloguer needs to create the item. This includes the reasons to examine a
- * field before use.
+ * MARC record to Wikidata draft. Pure: a record in, a draft out, no I/O.
+ * The draft carries the warnings that say which fields to examine.
  */
 
-import { datafields, subfields, subfield } from './marc.js';
+import { datafields, subfields, subfield, indicators } from './marc.js';
 import { invertName } from './names.js';
 import { describeFromOccupations, isAwkwardTerm, normalizeOccupation } from './normalize.js';
-import { extractDates, formatDateRange } from './dates.js';
+import { extractDates, formatDateParens, PRIVACY_BIRTH_YEAR } from './dates.js';
 
-/**
- * The default language for the label, the alias and the description.
- *
- * This is one constant. Thus you can read the language from 040 $b later with
- * a change to one line. You do not have to find string literals in the code.
- */
+/** The default language. One constant, so reading 040 $b later is one line. */
 export const DEFAULT_LANG = 'en';
 
 /**
@@ -31,7 +22,7 @@ export const DEFAULT_LANG = 'en';
  *   birth?: object,
  *   death?: object,
  *   dateSource: string,
- *   descriptionSource: 'occupation' | 'dates' | 'none',
+ *   descriptionSource: 'occupation' | 'dates' | 'occupation+dates' | 'none',
  *   warnings: Warning[],
  *   source: string
  * }} WikidataDraft
@@ -93,7 +84,7 @@ function buildLabel(rec, warnings) {
 
   const f = fields[0];
   const parsed = invertName(subfield(f, 'a'), {
-    ind1: f.getAttribute('ind1') ?? undefined,
+    ind1: rawInd1(f),
     titleWords: subfield(f, 'c'),
   });
 
@@ -105,8 +96,7 @@ function buildLabel(rec, warnings) {
 }
 
 /**
- * Make the aliases from each 400 variant name. Invert them in the same way as
- * the label.
+ * Make the aliases from the 400 variant names, inverted like the label.
  * @param {object} rec
  * @param {string} label
  * @param {Warning[]} warnings
@@ -118,11 +108,9 @@ function buildAliases(rec, label, warnings) {
   let uncertain = 0;
 
   for (const f of datafields(rec, '400')) {
-    // The $w subfield is a control subfield. It gives the relation. Example:
-    // "nnea" for an earlier form of the name. It is not name text. It does
-    // not go to the output.
+    // The $w subfield gives the relation, not name text. It is not used.
     const parsed = invertName(subfield(f, 'a'), {
-      ind1: f.getAttribute('ind1') ?? undefined,
+      ind1: rawInd1(f),
       titleWords: subfield(f, 'c'),
     });
 
@@ -130,7 +118,7 @@ function buildAliases(rec, label, warnings) {
     if (!value) continue;
     if (parsed.confidence === 'low') uncertain++;
 
-    // An alias that is the same as the label adds no data to the item.
+    // An alias equal to the label adds no data.
     const key = value.toLowerCase();
     if (key === label.toLowerCase() || seen.has(key)) continue;
 
@@ -150,19 +138,16 @@ function buildAliases(rec, label, warnings) {
 }
 
 /**
- * Make the description from the 374 occupations. If there are no occupations,
- * use a date range.
- *
- * The date range applies only when a death date is present. A person who is
- * alive and has no occupation gets no description. Do not use only a birth
- * year.
+ * Make the description: the occupations, then the years in parentheses.
+ * Either part can be absent. Refer to the README for the privacy rule.
  *
  * @param {object} rec
  * @param {Warning[]} warnings
- * @returns {{description: string, descriptionSource: 'occupation' | 'dates' | 'none'}}
+ * @returns {{description: string, descriptionSource: 'occupation' | 'dates' | 'occupation+dates' | 'none'}}
  */
 function buildDescription(rec, warnings) {
   const terms = datafields(rec, '374').flatMap((f) => subfields(f, 'a'));
+  const occupations = terms.length ? describeFromOccupations(terms) : '';
 
   if (terms.length) {
     const awkward = terms.filter(isAwkwardTerm);
@@ -173,18 +158,27 @@ function buildDescription(rec, warnings) {
         detail: `Kept LCSH syntax in: ${awkward.map(normalizeOccupation).join(', ')}.`,
       });
     }
-    return { description: describeFromOccupations(terms), descriptionSource: 'occupation' };
   }
 
   const { birth, death } = extractDates(rec);
-  const range = formatDateRange(birth, death);
+  const years = formatDateParens(birth, death);
 
-  if (range) return { description: range, descriptionSource: 'dates' };
+  // One space separates the two parts.
+  const description = [occupations, years].filter(Boolean).join(' ');
+
+  if (description) {
+    return {
+      description,
+      descriptionSource: occupations && years ? 'occupation+dates' : occupations ? 'occupation' : 'dates',
+    };
+  }
 
   if (birth && !death) {
     warnings.push({
       code: 'no-description',
-      detail: 'No occupation, and a birth date alone is not used as a description.',
+      detail:
+        `No occupation, and the person was born after ${PRIVACY_BIRTH_YEAR}. ` +
+        'The tool does not show the birth year of a person who can be alive.',
     });
   } else {
     warnings.push({ code: 'no-description', detail: 'No occupation and no dates.' });
@@ -194,8 +188,19 @@ function buildDescription(rec, warnings) {
 }
 
 /**
- * Give the aliases in the format that Wikidata uses: one field with vertical
- * bars between the values.
+ * The first indicator as written in the record. indicators() gives "#" for a
+ * blank, but invertName needs undefined.
+ *
+ * @param {object} field
+ * @returns {string | undefined}
+ */
+function rawInd1(field) {
+  const v = indicators(field).ind1;
+  return v === '#' ? undefined : v;
+}
+
+/**
+ * The aliases with vertical bars between them, as Wikidata expects.
  * @param {WikidataDraft} draft
  * @returns {string}
  */

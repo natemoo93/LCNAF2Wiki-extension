@@ -1,22 +1,13 @@
 /**
- * Wikidata "create a new item" links.
- *
- * Special:NewItem accepts lang, label, description and aliases as query
- * parameters. The server puts them in the form. Thus a link that is filled in
- * before use needs no script on the Wikidata side. Vertical bars separate the
- * aliases. The draft uses that format.
- *
- * The link only fills in the page. Wikidata saves no data until the cataloguer
- * examines the form and pushes Create.
+ * Prefilled Special:NewItem links. The server renders the query parameters
+ * into the form. Nothing is saved until the cataloguer presses Create.
  */
 
 const NEW_ITEM_URL = 'https://www.wikidata.org/wiki/Special:NewItem';
 
 /**
- * Build a Special:NewItem URL for a draft with the values filled in.
- *
- * Do not send empty fields. Omit them. Thus the form shows its own placeholder
- * text and not an empty box.
+ * Build a prefilled Special:NewItem URL. Empty fields are omitted, so the
+ * form shows its own placeholder text.
  *
  * @param {import('./mapper.js').WikidataDraft} draft
  * @returns {string}

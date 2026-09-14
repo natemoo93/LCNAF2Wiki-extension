@@ -1,13 +1,6 @@
 /**
- * Passive field extraction.
- *
- * This module reports the contents of the 100, 400 and 374 fields. It does no
- * name inversion, no singularization, and no label, alias or description
- * mapping. That transformation work is not in the scope of this module.
- *
- * This layer shows the cataloguer the shape of the record without changes. It
- * also identifies which subfields occur in practice. Write the rules that use
- * those subfields after this step.
+ * Passive extraction of the 100, 400 and 374 fields, with no transformation.
+ * It shows the shape of the record. mapper.js does the mapping.
  */
 
 import { datafields, subfields, subfield, allSubfields, indicators, controlfield } from './marc.js';
@@ -45,28 +38,8 @@ export function extractFields(rec) {
 }
 
 /**
- * The status of one tag group. The status sets the colour in the UI.
- *
- * - `present`   The field is present and is easy to read.      (green)
- * - `absent`    The field is not in this record.               (grey)
- * - `notable`   The field is present and contains more than a
- *               quick reading finds. It has more than one
- *               value, or a subfield with name data in
- *               addition to $a.                                (blue)
- * - `attention` The shape of the record is a problem. You
- *               cannot build an item from it.                  (red)
- *
- * Grey and blue keep the red status important.
- *
- * The `absent` status is not an error. Most LCNAF records correctly have no
- * 374 field and no 400 field. If you make that condition red, the usual
- * record looks defective.
- *
- * The `notable` status applies to usual records for which the cataloguer must
- * make a decision. Examples: which of four occupations to put in a
- * description, or whether to make a fuller form of the name into an alias. If
- * you give those records the same colour as an unusable record, persons learn
- * to ignore the red status.
+ * The status of one tag group, which sets its colour: present (green), absent
+ * (grey), notable (blue), attention (red). Refer to the README.
  *
  * @typedef {'present' | 'absent' | 'notable' | 'attention'} Status
  */
@@ -85,8 +58,7 @@ function assess(tag, fields, rec) {
 
   if (tag === '100') {
     if (fields.length === 0) {
-      // Without an authorized personal-name heading you cannot build a
-      // label. This is the only absence that is a problem.
+      // Without a personal-name heading you cannot build a label.
       attention = true;
       if (datafields(rec, '110').length) {
         messages.push('Corporate name (110), not a personal name.');
@@ -102,11 +74,10 @@ function assess(tag, fields, rec) {
       }
       for (const f of fields) {
         if (f.titleWords) {
-          // The position of a title in direct order is a decision for a
-          // person. Examples: "Sir John Smith", but "Irwin B. Rothschild
-          // III".
+          // The position of a title is a decision for a person.
+          // Examples: "Sir John Smith", but "Irwin B. Rothschild III".
           attention = true;
-          messages.push(`$c "${f.titleWords}" — check placement in direct order.`);
+          messages.push(`$c "${f.titleWords}": check placement in direct order.`);
         }
         if (f.fullerForm) {
           notable = true;
@@ -116,10 +87,8 @@ function assess(tag, fields, rec) {
   }
 
   if (tag === '374') {
-    // More than one occupation can occur as a repeated $a in one field or as
-    // separate fields. This is a serialisation detail. In the two conditions
-    // the chip becomes blue and the MARC lines below show the terms. No
-    // message is necessary.
+    // Repeated $a or separate fields is a serialisation detail. The chip
+    // becomes blue and the MARC lines show the terms, so no message is needed.
     const terms = fields.flatMap((f) => f.values);
     if (terms.length > 1) {
       notable = true;
@@ -165,12 +134,9 @@ function describeField(el, tag, index) {
     index,
     ...indicators(el),
     subfields: allSubfields(el),
-    // The $a subfield repeats in one 374 field. One datafield can have more
-    // than one occupation. Thus this is an array and not a scalar, also for
-    // the 100 field.
+    // The $a subfield repeats in one 374 field, so this is always an array.
     values: subfields(el, 'a'),
-    // Accessors that the UI highlights. The value is undefined when the
-    // subfield is absent.
+    // Accessors the UI highlights. Undefined when the subfield is absent.
     dates: subfield(el, 'd'),
     titleWords: subfield(el, 'c'),
     fullerForm: subfield(el, 'q'),
@@ -204,11 +170,8 @@ function headingOf(rec) {
 }
 
 /**
- * Normalize an LCNAF identifier. Remove all space characters in the identifier
- * and at each end. Thus "n  83053245" becomes "n83053245".
- *
- * LC prints identifiers with padding. The padding is not a part of the
- * identifier.
+ * Normalize an LCNAF identifier. LC prints padding that is not part of the
+ * identifier, so "n  83053245" becomes "n83053245".
  * @param {string} raw
  * @returns {string}
  */

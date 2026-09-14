@@ -1,21 +1,14 @@
 /**
- * Name inversion.
- *
- * LCNAF puts the surname first in a personal name ("Dyche, Grace Locke
- * Scripps"). Wikidata labels use direct order ("Grace Locke Scripps Dyche").
- *
- * The first indicator of the MARC 100 and 400 fields gives the shape of the
- * heading. Read the indicator. Do not estimate the shape. An ind1 of "1" is
- * surname first. An ind1 of "0" is a forename or a single name. Do not change
- * a name that has an ind1 of "0".
+ * Name inversion. LCNAF puts the surname first; Wikidata uses direct order.
+ * The first indicator gives the shape: "1" is surname first, "0" is not.
  */
 
 /** MARC punctuation at the end: a comma or a period used as a separator. */
 const TRAILING_PUNCT = /[,.]+\s*$/;
 
 /**
- * A name that the module cannot invert with confidence gives a `direct` value
- * and a reason. The caller shows the value. A person then corrects it.
+ * A name that cannot be inverted with confidence still gives a `direct` value
+ * and a reason, so a person can correct it.
  *
  * @typedef {'high' | 'low'} Confidence
  * @typedef {{
@@ -32,9 +25,7 @@ const TRAILING_PUNCT = /[,.]+\s*$/;
  *
  * @param {string} rawA the value of subfield $a
  * @param {{ind1?: string, titleWords?: string}} [opts]
- *   `ind1` is the first indicator of the datafield. `titleWords` is $c. The
- *   module reports $c but does not put it in position. Refer to the notes
- *   below.
+ *   `titleWords` is $c, which is reported but never placed automatically.
  * @returns {ParsedName}
  */
 export function invertName(rawA, opts = {}) {
@@ -44,8 +35,7 @@ export function invertName(rawA, opts = {}) {
     return { direct: '', confidence: 'low', reason: 'Empty $a.' };
   }
 
-  // An ind1 of "0" identifies a forename or a single name. That name is
-  // already in direct order ("Aristotle"). Do not invert it.
+  // An ind1 of "0" is already in direct order ("Aristotle").
   if (opts.ind1 === '0') {
     return { direct: cleaned, forename: cleaned, confidence: 'high' };
   }
@@ -53,10 +43,8 @@ export function invertName(rawA, opts = {}) {
   const commas = countCommas(cleaned);
 
   if (commas === 0) {
-    // There is no comma to divide the name at. This is usual for single
-    // names. An incorrectly formed heading also has this shape. Thus report
-    // the condition when the indicator gives surname first. Do not accept it
-    // without a message.
+    // No comma to divide at. Usual for single names, but also the shape of
+    // an incorrect heading, so report it when ind1 gives surname first.
     return {
       direct: cleaned,
       confidence: opts.ind1 === '1' ? 'low' : 'high',
@@ -70,24 +58,20 @@ export function invertName(rawA, opts = {}) {
   const direct = collapseSpaces(`${rest} ${surname}`);
 
   if (commas > 1) {
-    // "Ludwig II, King of Bavaria" inverts to "King of Bavaria Ludwig II".
-    // That result is incorrect. A second comma usually shows an epithet or an
-    // added qualifier and not a forename. A person must examine this
-    // condition.
+    // A second comma usually shows an epithet, not a forename.
+    // "Ludwig II, King of Bavaria" would invert incorrectly.
     return {
       direct,
       surname,
       forename: rest,
       confidence: 'low',
-      reason: 'More than one comma — may be an epithet or qualifier, not a forename.',
+      reason: 'More than one comma. May be an epithet or qualifier, not a forename.',
     };
   }
 
   if (looksLikeEpithet(rest)) {
-    // "Ludwig II, King of Bavaria" has one comma. But the text after the
-    // comma is a title and not a forename. Inversion gives "King of Bavaria
-    // Ludwig II". Function words identify this condition. Correct forenames
-    // do not contain function words.
+    // One comma, but the text after it is a title. Function words identify
+    // this condition, because forenames do not contain them.
     return {
       direct,
       surname,
@@ -98,10 +82,8 @@ export function invertName(rawA, opts = {}) {
   }
 
   if (opts.titleWords) {
-    // The position of $c is ambiguous. "Sir" goes before the name ("Sir John
-    // Smith"). "III" and "Jr." go after the name ("Irwin B. Rothschild III").
-    // An estimate is incorrect 50 percent of the time. Thus return the base
-    // name and set a flag.
+    // The position of $c is ambiguous: "Sir John Smith" but "Irwin B.
+    // Rothschild III". Return the base name and set a flag.
     return {
       direct,
       surname,
@@ -115,8 +97,7 @@ export function invertName(rawA, opts = {}) {
 }
 
 /**
- * Remove a date range at the end of $a. Some headings put the date range in $a
- * and not in $d. Example: "Smith, John, 1832-1901".
+ * Remove a date range at the end of $a, as in "Smith, John, 1832-1901".
  * @param {string} raw
  * @returns {string}
  */
@@ -125,14 +106,13 @@ export function stripDates(raw) {
 }
 
 /**
- * Remove the comma or the period that MARC uses as a separator at the end of
- * the value. 53 of the 92 sample records need this step before inversion.
+ * Remove the comma or period that MARC uses as a separator at the end.
  * @param {string} raw
  * @returns {string}
  */
 export function stripTrailingPunct(raw) {
-  // Remove a comma at the end first. "Rothschild, Irwin B.," ends with a
-  // comma. But the period before the comma is a part of the initial.
+  // Remove the comma first. In "Rothschild, Irwin B.," the period before
+  // it belongs to the initial.
   const s = raw.replace(/,\s*$/, '').trim();
 
   // An initial keeps its period. Do not change "Sween, Joyce A." to
@@ -143,9 +123,7 @@ export function stripTrailingPunct(raw) {
 }
 
 /**
- * Function words that occur in titles and epithets ("King of Bavaria", "Duke
- * of Wellington") but not in forenames. If one of these words occurs after the
- * comma, the heading is not a usual surname and forename pair.
+ * Function words that occur in titles and epithets but not in forenames.
  */
 const EPITHET_WORDS = /\b(of|de|del|della|di|van|von|the|d')\b/i;
 
@@ -154,9 +132,7 @@ const EPITHET_WORDS = /\b(of|de|del|della|di|van|von|the|d')\b/i;
  * @returns {boolean}
  */
 function looksLikeEpithet(rest) {
-  // The words "van" and "von" also occur in surnames. But this function
-  // examines only the text after the comma. A surname particle does not occur
-  // in that position.
+  // "van" and "von" also occur in surnames, but not after the comma.
   return EPITHET_WORDS.test(rest);
 }
 

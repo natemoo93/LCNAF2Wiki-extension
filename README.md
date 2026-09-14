@@ -128,7 +128,7 @@ Below the derived fields, each MARC tag is one colour-coded chip:
 |---|---|
 | **Green** | Present and reads straightforwardly. |
 | **Grey** | Not in present this record. |
-| **Blue** `i` | Present, but human review suggested.|
+| **Yellow** `i` | Present, but human review suggested.|
 | **Red** `!` | The record shape is a problem for building an item. |
 
 A chip shows its count when a tag repeats (`400 ×3`). Hover or focus a chip to

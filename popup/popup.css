@@ -20,9 +20,9 @@
   --warn-line: #e09aa0;
   --warn-fg: #a02631;
 
-  --info-bg: #e9f0fb;
-  --info-line: #90b4e2;
-  --info-fg: #1f4f8f;
+  --info-bg: #fdf3d9;
+  --info-line: #dcb44e;
+  --info-fg: #7a5600;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,9 +46,9 @@
     --warn-line: #7d4046;
     --warn-fg: #e79ba3;
 
-    --info-bg: #1f2938;
-    --info-line: #3d5c85;
-    --info-fg: #9dbde8;
+    --info-bg: #332b18;
+    --info-line: #856c2c;
+    --info-fg: #e3c46a;
   }
 }
 

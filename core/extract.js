@@ -39,7 +39,7 @@ export function extractFields(rec) {
 
 /**
  * The status of one tag group, which sets its colour: present (green), absent
- * (grey), notable (blue), attention (red). Refer to the README.
+ * (grey), notable (yellow), attention (red). Refer to the README.
  *
  * @typedef {'present' | 'absent' | 'notable' | 'attention'} Status
  */
@@ -88,7 +88,7 @@ function assess(tag, fields, rec) {
 
   if (tag === '374') {
     // Repeated $a or separate fields is a serialisation detail. The chip
-    // becomes blue and the MARC lines show the terms, so no message is needed.
+    // becomes yellow and the MARC lines show the terms, so no message is needed.
     const terms = fields.flatMap((f) => f.values);
     if (terms.length > 1) {
       notable = true;

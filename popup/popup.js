@@ -134,7 +134,7 @@ function renderRecord(record, draft, settings) {
   draftPanel._sizeFields?.();
 
   // Open the most significant group, so the record explains itself.
-  // Red outranks blue, which outranks green.
+  // Red outranks yellow, which outranks green.
   const rank = ['attention', 'notable', 'present'];
   const opener = rank.map((s) => record.groups.find((g) => g.status === s)).find(Boolean);
   controller.pin(opener);

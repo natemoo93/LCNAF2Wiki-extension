@@ -29,19 +29,6 @@ closes, so repeat these steps each session until the add-on is signed.
 No build step. The source is plain ES modules and loads as-is; edits take effect
 after **Reload** on the extensions page.
 
-### Packaging a .zip
-
-Zip the *contents*, not the folder. `manifest.json` must sit at the root of the
-archive; if it lands under a nested folder, Firefox reports the package as
-corrupt. On Windows, Explorer's **Send to → Compressed (zipped) folder**
-wraps the folder, so select the files themselves:
-
-```
-manifest.json  background.js  core/  options/  popup/
-```
-
-`test/` is not needed at runtime and can be left out.
-
 ## Use
 
 Either:

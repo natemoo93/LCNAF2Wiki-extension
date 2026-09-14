@@ -102,13 +102,21 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 /**
  * Open the popup. openPopup needs a popup set, which `create` removes, so this
- * sets it, opens it and removes it again. On failure it stays set.
+ * sets it, opens it and removes it again.
  */
 async function openPopup() {
   try {
     await chrome.action.setPopup({ popup: POPUP });
     await chrome.action.openPopup();
     await chrome.action.setPopup({ popup: '' });
+    return;
+  } catch {
+    // Firefox does not always permit openPopup. Fall through to a tab.
+  }
+
+  // Open the popup as a usual tab, so the click always does something.
+  try {
+    await chrome.tabs.create({ url: chrome.runtime.getURL(POPUP) });
   } catch {
     // The popup stays set, so the next click opens it.
     badge('!', '#a02631');

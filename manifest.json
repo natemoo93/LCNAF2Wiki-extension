@@ -7,6 +7,7 @@
   "host_permissions": ["https://id.loc.gov/*", "https://www.wikidata.org/*"],
   "background": {
     "service_worker": "background.js",
+    "scripts": ["background.js"],
     "type": "module"
   },
   "action": {
@@ -15,5 +16,11 @@
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": false
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "lcnaf2wiki@nulib.northwestern.edu",
+      "strict_min_version": "115.0"
+    }
   }
 }

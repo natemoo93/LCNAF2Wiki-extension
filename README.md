@@ -1,4 +1,4 @@
-# LCNAF2Wiki Browser Extension
+# LCNAF2Wiki browser extension
 
 Turns an LCNAF authority record into the fields needed to create a Wikidata
 item: **Label**, **Description**, **Aliases**, and language. Each field is
@@ -6,13 +6,41 @@ editable in place and copyable, with QuickStatements output for the whole item.
 
 ## Install (unpacked)
 
+One manifest serves both browsers. Chrome reads `background.service_worker`,
+Firefox reads `background.scripts`, and each ignores the other's key.
+
+### Chrome or Edge
+
 1. Open `chrome://extensions` (or `edge://extensions`).
 2. Turn on **Developer mode**.
-3. **Load unpacked** → select this `extension/` folder.
+3. **Load unpacked** → select this `LCNAF2Wiki-extension/` folder.
 4. Pin the extension so its toolbar button is visible.
 
+### Firefox
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. **Load Temporary Add-on**.
+3. Select `manifest.json` inside this folder, or a packaged `.zip`.
+4. Pin the extension so its toolbar button is visible.
+
+Firefox 115 or later is required. A temporary add-on is removed when Firefox
+closes, so repeat these steps each session until the add-on is signed.
+
 No build step. The source is plain ES modules and loads as-is; edits take effect
-after hitting reload on the extensions page.
+after **Reload** on the extensions page.
+
+### Packaging a .zip
+
+Zip the *contents*, not the folder. `manifest.json` must sit at the root of the
+archive; if it lands under a nested folder, Firefox reports the package as
+corrupt. On Windows, Explorer's **Send to → Compressed (zipped) folder**
+wraps the folder, so select the files themselves:
+
+```
+manifest.json  background.js  core/  options/  popup/
+```
+
+`test/` is not needed at runtime and can be left out.
 
 ## Use
 

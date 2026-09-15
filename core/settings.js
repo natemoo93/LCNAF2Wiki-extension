@@ -4,11 +4,11 @@
  */
 
 /**
- * The default value of each setting. Both defaults are the safe condition:
- * no Wikidata request, and a click that opens the popup.
+ * The default value of each setting. The duplicate check is on, because a
+ * duplicate item costs more work than the request it takes to find one.
  */
 export const DEFAULTS = {
-  checkDuplicates: false,
+  checkDuplicates: true,
   clickAction: 'menu',
 };
 
@@ -53,7 +53,8 @@ export async function getSettings() {
  */
 function clean(s) {
   return {
-    checkDuplicates: s.checkDuplicates === true,
+    checkDuplicates:
+      typeof s.checkDuplicates === 'boolean' ? s.checkDuplicates : DEFAULTS.checkDuplicates,
     clickAction: CLICK_ACTIONS.includes(s.clickAction) ? s.clickAction : DEFAULTS.clickAction,
   };
 }

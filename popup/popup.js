@@ -204,14 +204,13 @@ function renderDraft(draft, settings = {}) {
 
 /**
  * Lock the create button until the duplicate check is complete. A duplicate
- * makes it grey; a click restores it. Refer to the README for the fail-open
- * rule.
+ * makes it amber, and a click opens the item that holds this identifier.
+ * Refer to the README for the fail-open rule.
  *
  * @param {HTMLButtonElement} button
  * @param {string} lcnafId
  */
 async function guardCreate(button, lcnafId) {
-  const label = button.textContent;
   button.disabled = true;
 
   const result = await findDuplicates(lcnafId);
@@ -222,26 +221,24 @@ async function guardCreate(button, lcnafId) {
     return;
   }
 
-  // A duplicate. The title names the item that the search found.
+  // A duplicate. The search gives a page address for each item it found.
+  // An address is necessary to open the item, so without one, fail open.
+  const [first] = result.items;
+  if (!first?.url) {
+    button.disabled = false;
+    return;
+  }
   const found = result.items.map((i) => i.id).join(', ');
   button.disabled = false;
-  button.textContent = 'Entry exists';
+  button.textContent = 'Entry exists ↗';
   button.className = 'copy copy-exists';
   button.title = found
-    ? `Already in Wikidata as ${found} (P244 ${lcnafId}). Click to create one more item.`
-    : `Already in Wikidata (P244 ${lcnafId}). Click to create one more item.`;
+    ? `Already in Wikidata as ${found} (P244 ${lcnafId}). Click to open the item.`
+    : `Already in Wikidata (P244 ${lcnafId}). Click to open the item.`;
 
-  // Capture phase and stopImmediatePropagation keep this before the handler
-  // that opens Wikidata, so the first click only resets.
-  const reset = (e) => {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    button.removeEventListener('click', reset, true);
-    button.textContent = label;
-    button.className = 'copy copy-primary';
-    button.removeAttribute('title');
-  };
-  button.addEventListener('click', reset, true);
+  // The button now points at the item that exists. linkButton reads this
+  // address instead of the create address, so only one tab opens.
+  button.dataset.overrideUrl = first.url;
 }
 
 /**
@@ -295,14 +292,21 @@ function linkButton(label, getUrl, variant) {
     label,
   );
 
-  btn.addEventListener('click', () => {
-    const url = getUrl();
-    // chrome.tabs is unavailable when the popup opens as a usual page.
-    if (globalThis.chrome?.tabs?.create) chrome.tabs.create({ url });
-    else window.open(url, '_blank', 'noreferrer');
-  });
+  // An override sends the click somewhere else, such as to a Wikidata item
+  // that already holds this identifier.
+  btn.addEventListener('click', () => openUrl(btn.dataset.overrideUrl || getUrl()));
 
   return btn;
+}
+
+/**
+ * Open an address in a new tab.
+ * @param {string} url
+ */
+function openUrl(url) {
+  // chrome.tabs is unavailable when the popup opens as a usual page.
+  if (globalThis.chrome?.tabs?.create) chrome.tabs.create({ url });
+  else window.open(url, '_blank', 'noreferrer');
 }
 
 /**

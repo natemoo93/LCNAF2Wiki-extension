@@ -74,14 +74,14 @@ immediately and take effect on the next click.
 
 | Setting | Default | What it does |
 |---|---|---|
-| **Check for duplicates first** | Off | Before unlocking **Create in Wikidata**, search Wikidata for an item that already carries this LCNAF id in `P244`. |
+| **Check for duplicates first** | On | Before unlocking **Create in Wikidata**, search Wikidata for an item that already carries this LCNAF id in `P244`. |
 | **Toolbar icon click** | Open the full menu | Whether clicking the toolbar icon opens this popup, or goes straight to a prefilled `Special:NewItem`. |
 
 An exact `P244` match is proof of a duplicate; a name match is not, since two
 people can share a name. When a match is found, **Create in Wikidata** turns
-grey and reads **Entry exists**, naming the matching item in its tooltip. One
-click returns it to the normal create button, for cases where the existing
-item's `P244` is itself wrong; a second click then creates the item.
+amber and reads **Entry exists**, naming the matching item in its tooltip.
+A click opens that item in a new tab, so the cataloger can see the record that
+already exists.
 
 The check fails open. If Wikidata is unreachable, rate-limits the request, or
 does not answer within 6 seconds, the button returns to normal. A failed

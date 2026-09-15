@@ -34,8 +34,8 @@ test.afterEach(() => {
   delete globalThis.chrome;
 });
 
-test('the defaults are a duplicate check that is off and the menu behaviour', () => {
-  assert.equal(DEFAULTS.checkDuplicates, false);
+test('the defaults are a duplicate check that is on and the menu behaviour', () => {
+  assert.equal(DEFAULTS.checkDuplicates, true);
   assert.equal(DEFAULTS.clickAction, 'menu');
 });
 
@@ -72,8 +72,14 @@ test('a clickAction that is not a string gets the default', async () => {
   assert.equal((await getSettings()).clickAction, 'menu');
 });
 
-test('a checkDuplicates value that is not a boolean becomes false', async () => {
+test('a checkDuplicates value that is not a boolean gets the default', async () => {
   stubStorage({ checkDuplicates: 'yes' });
+  assert.equal((await getSettings()).checkDuplicates, DEFAULTS.checkDuplicates);
+});
+
+test('a stored false stays false', async () => {
+  // The default is true, so an off setting must survive the check.
+  stubStorage({ checkDuplicates: false });
   assert.equal((await getSettings()).checkDuplicates, false);
 });
 

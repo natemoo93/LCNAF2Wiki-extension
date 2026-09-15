@@ -486,17 +486,17 @@ footer a:hover {
 
 /* ---- duplicate check ---- */
 
-/* The create button in its "entry exists" condition. A click makes it the
-   usual create button again. */
+/* The create button in its "entry exists" condition. A click opens the
+   Wikidata item that holds this LCNAF identifier. */
 .copy-exists {
-  border-color: var(--off-line);
-  background: var(--off-bg);
-  color: var(--off-fg);
+  border-color: var(--info-line);
+  background: var(--info-bg);
+  color: var(--info-fg);
 }
 
 .copy-exists:hover {
-  border-color: var(--off-line);
-  color: var(--off-fg);
+  border-color: var(--info-fg);
+  color: var(--info-fg);
 }
 
 /* ---- footer ---- */

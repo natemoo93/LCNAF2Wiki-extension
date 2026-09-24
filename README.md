@@ -116,12 +116,6 @@ record disagrees, because the record is one source among several and the item
 can hold work the tool knows nothing about. Replacing a value is a judgment
 for a cataloguer on Wikidata, not for this tool.
 
-That rule is enforced three times over: the comparison only ever marks a field
-`add`, the patch is built only from additions, and `patchItem` refuses any
-operation that is not an `add` before the request leaves the extension. An
-alias is appended with the JSON Patch `/-` path, so an alias somebody adds
-between the read and the write is not lost.
-
 After a save the button reads the new Q-number and stays disabled, so a second
 press cannot make a duplicate. A failed save leaves the draft untouched, so
 nothing typed is lost; an expired sign-in says so and asks for another.
@@ -155,24 +149,6 @@ The check runs in order, stopping at the first thing it finds:
 
 An exact identifier match is proof of a duplicate; a name match is not, since
 two people can share a name.
-
-Step 2 exists because VIAF clusters LC with the national libraries. An item
-built from a German or French record carries the same VIAF number and often no
-`P244` at all, so the `P244` search cannot see it. Roughly a quarter of LCNAF
-records name a VIAF cluster in `024`; a record that names none skips the step.
- When a match is found, **Create in Wikidata** turns
-amber and reads **Entry exists**, naming the matching item in its tooltip.
-A click opens that item in a new tab, so the cataloger can see the record that
-already exists. This holds for a save through the API too: when a match is
-found, the button is rebuilt so that the only thing it can do is open the item.
-A save cannot be pressed through a duplicate warning.
-
-When the `P244` search finds nothing, the tool tries a second check: the
-Wikidata query service looks for a person with the same label and both the
-same years, and with no `P244` of their own. This finds an item that someone
-made without this tool. Two people can share a name, so a hit here is evidence
-and not proof: the button turns amber with a dashed border and reads
-**Possible match ↗**, and the cataloguer opens the item and judges it.
 
 Both years must be present, and each may differ by one, because catalogues
 disagree about a birth or death year by a year often enough to matter. A

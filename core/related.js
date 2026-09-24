@@ -12,7 +12,8 @@
  * there puts a false claim about a real person into a public database.
  */
 
-import { datafields, subfield, subfields } from './marc.js';
+import { datafields, indicators, subfield, subfields } from './marc.js';
+import { invertName } from './names.js';
 
 /**
  * How far a relationship can be trusted.
@@ -26,8 +27,12 @@ import { datafields, subfield, subfields } from './marc.js';
  */
 
 /**
+ * `name` is in direct order, so it can be copied into Wikidata as it reads.
+ * `heading` keeps the inverted form the record wrote, for the MARC line.
+ *
  * @typedef {{
  *   name: string,
+ *   heading: string,
  *   dates?: string,
  *   designator?: string,
  *   confidence: Confidence,
@@ -60,8 +65,14 @@ export function extractRelated(rec) {
   const out = [];
 
   for (const f of datafields(rec, '500')) {
-    const name = (subfield(f, 'a') ?? '').trim().replace(/,$/, '');
-    if (!name) continue;
+    const heading = (subfield(f, 'a') ?? '').trim().replace(/,$/, '');
+    if (!heading) continue;
+
+    // The chip is read and copied into Wikidata, which uses direct order.
+    // ind1 says whether the heading is inverted at all: "0" is a name that
+    // is already direct, such as a one-word persona.
+    const parsed = invertName(subfield(f, 'a'), { ind1: rawInd1(f) });
+    const name = parsed.direct || heading;
 
     // $i carries the relationship in words, under RDA. $4 carries it as a
     // URI or a code. Either one makes the relationship explicit.
@@ -70,6 +81,7 @@ export function extractRelated(rec) {
 
     const related = {
       name,
+      heading,
       dates: subfield(f, 'd'),
       designator: designator || undefined,
       confidence: designator || hasCode ? 'stated' : 'unclear',
@@ -138,4 +150,16 @@ export function describeRelated(related, note) {
 /** The names in a list, separated by commas. */
 function list(related) {
   return related.map((r) => r.name).join(', ');
+}
+
+/**
+ * The first indicator as written in the record. indicators() gives "#" for a
+ * blank, but invertName needs undefined.
+ *
+ * @param {object} field
+ * @returns {string | undefined}
+ */
+function rawInd1(field) {
+  const v = indicators(field).ind1;
+  return v === '#' ? undefined : v;
 }

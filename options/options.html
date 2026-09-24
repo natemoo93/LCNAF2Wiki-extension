@@ -30,6 +30,27 @@
 
           <div class="setting setting-block">
             <span class="setting-text">
+              <span class="setting-name">Text filters</span>
+              <span class="setting-note">
+                Replace text as it is read from the record, before the fields are
+                built. Use this for a character LC does not send correctly, or
+                one your workflow always rewrites.
+              </span>
+              <span class="setting-note">
+                Each filter is literal text, not a pattern. Filters run in order,
+                and apply to the name, the variant names and the occupations.
+              </span>
+
+              <div id="filters" class="filters"></div>
+
+              <button type="button" id="add-filter" class="btn btn-add">
+                + Add a filter
+              </button>
+            </span>
+          </div>
+
+          <div class="setting setting-block">
+            <span class="setting-text">
               <span class="setting-name">A different OAuth client</span>
               <span class="setting-note">
                 LCNAF2Wiki comes with a registered client, so this can stay empty.

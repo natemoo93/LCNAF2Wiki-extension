@@ -4,6 +4,7 @@
  */
 
 import { getSettings, setSetting } from '../core/settings.js';
+import { cleanFilters, MAX_FILTERS } from '../core/filters.js';
 import {
   getBuiltInClientId,
   getClientId,
@@ -26,6 +27,15 @@ const saveRadios = document.querySelectorAll('input[name="save-method"]');
 const clientInput = document.getElementById('client-id');
 const accountState = document.getElementById('account-state');
 const redirectBox = document.getElementById('redirect-uri');
+const filterList = document.getElementById('filters');
+const addFilterButton = document.getElementById('add-filter');
+
+/**
+ * The filters as the page holds them. The rows are the truth while editing,
+ * and this is written to the store on every change.
+ * @type {{replace: string, with: string}[]}
+ */
+let filters = [];
 
 init();
 
@@ -55,6 +65,16 @@ async function init() {
       if (radio.checked) setSetting('saveMethod', radio.value);
     });
   }
+
+  filters = Array.isArray(settings.textFilters) ? [...settings.textFilters] : [];
+  renderFilters();
+
+  addFilterButton.addEventListener('click', () => {
+    filters.push({ replace: '', with: '' });
+    renderFilters();
+    // Put the cursor in the row that was just made.
+    filterList.querySelector('.filter-row:last-child .filter-from')?.focus();
+  });
 
   // The field holds the override only. Showing the built-in id here would
   // read as a value the user had typed, and clearing it would do nothing.
@@ -123,6 +143,96 @@ async function startSignIn() {
   }
 
   await renderAccount();
+}
+
+
+/* ---------- text filters ---------- */
+
+/** Paint every filter row. */
+function renderFilters() {
+  filterList.replaceChildren();
+
+  for (const [index, filter] of filters.entries()) {
+    filterList.append(filterRow(filter, index));
+  }
+
+  if (filters.length === 0) {
+    filterList.append(note('No filters. The record text is used as it arrives.'));
+  }
+
+  // The store has a size limit, so the list has an end.
+  addFilterButton.disabled = filters.length >= MAX_FILTERS;
+}
+
+/**
+ * One filter: the text to replace, the text to put in its place, and a
+ * button to remove the row.
+ *
+ * @param {{replace: string, with: string}} filter
+ * @param {number} index
+ */
+function filterRow(filter, index) {
+  const row = document.createElement('div');
+  row.className = 'filter-row';
+
+  const from = filterInput('replace:', filter.replace, 'filter-from', (value) => {
+    filters[index].replace = value;
+    saveFilters();
+  });
+
+  const to = filterInput('with:', filter.with, 'filter-to', (value) => {
+    filters[index].with = value;
+    saveFilters();
+  });
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'filter-remove';
+  remove.textContent = '×';
+  remove.title = 'Remove this filter';
+  remove.setAttribute('aria-label', `Remove filter ${index + 1}`);
+  remove.addEventListener('click', () => {
+    filters.splice(index, 1);
+    renderFilters();
+    saveFilters();
+  });
+
+  row.append(from, to, remove);
+  return row;
+}
+
+/**
+ * One labelled field in a filter row.
+ *
+ * @param {string} label
+ * @param {string} value
+ * @param {string} className
+ * @param {(value: string) => void} onChange
+ */
+function filterInput(label, value, className, onChange) {
+  const wrap = document.createElement('label');
+  wrap.className = 'filter-field';
+
+  const name = document.createElement('span');
+  name.className = 'filter-label';
+  name.textContent = label;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = `text-input ${className}`;
+  input.value = value ?? '';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  // Write as the user types, so a filter is never half saved.
+  input.addEventListener('input', () => onChange(input.value));
+
+  wrap.append(name, input);
+  return wrap;
+}
+
+/** Write the filters, dropping any row that cannot be used. */
+function saveFilters() {
+  setSetting('textFilters', cleanFilters(filters));
 }
 
 /* ---------- small builders ---------- */

@@ -3,6 +3,8 @@
  * getSettings always gives a complete object, with defaults for missing keys.
  */
 
+import { cleanFilters } from './filters.js';
+
 /**
  * The default value of each setting. The duplicate check is on, because a
  * duplicate item costs more work than the request it takes to find one.
@@ -10,6 +12,7 @@
 export const DEFAULTS = {
   checkDuplicates: true,
   saveMethod: 'api',
+  textFilters: [],
 };
 
 /**
@@ -56,6 +59,7 @@ function clean(s) {
     checkDuplicates:
       typeof s.checkDuplicates === 'boolean' ? s.checkDuplicates : DEFAULTS.checkDuplicates,
     saveMethod: SAVE_METHODS.includes(s.saveMethod) ? s.saveMethod : DEFAULTS.saveMethod,
+    textFilters: cleanFilters(s.textFilters),
   };
 }
 
@@ -63,7 +67,7 @@ function clean(s) {
  * Write one setting.
  *
  * @param {keyof typeof DEFAULTS} key
- * @param {boolean | string} value
+ * @param {boolean | string | object[]} value
  * @returns {Promise<void>}
  */
 export async function setSetting(key, value) {

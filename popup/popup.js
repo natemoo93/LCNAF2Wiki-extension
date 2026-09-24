@@ -98,7 +98,8 @@ async function lookup(id) {
 
     const rec = parseMarcXml(xml, id);
     const settings = await getSettings();
-    renderRecord(extractFields(rec), mapRecord(rec), settings);
+    const draft = mapRecord(rec, { textFilters: settings.textFilters });
+    renderRecord(extractFields(rec), draft, settings);
   } catch (err) {
     if (ctl.signal.aborted || err.name === 'AbortError') return;
     renderError(err);

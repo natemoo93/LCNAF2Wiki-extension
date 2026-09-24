@@ -238,3 +238,78 @@ footer a {
 .advanced[open] summary {
   margin-bottom: 6px;
 }
+
+/* ---- text filters ---- */
+
+.filters {
+  margin: 8px 0;
+}
+
+/* One filter: two fields and a remove button on one line. The fields share
+   the width, so a long replacement is as readable as a short one. */
+.filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 6px;
+}
+
+.filter-field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filter-label {
+  font-size: 11px;
+  color: var(--muted, #61656e);
+}
+
+/* The filter fields hold text that the record sent, which can be in any
+   script. A monospace face makes a damaged character visible. */
+.filter-row .text-input {
+  margin: 0;
+}
+
+/* The remove button lines up with the fields, not with their labels. */
+.filter-remove {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line, #d7dade);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted, #61656e);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.filter-remove:hover {
+  border-color: #a02631;
+  color: #a02631;
+}
+
+.filter-remove:focus-visible {
+  outline: 2px solid var(--accent, #4e2a84);
+  outline-offset: 1px;
+}
+
+.btn-add {
+  font-size: 11px;
+}
+
+.btn-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (prefers-color-scheme: dark) {
+  .filter-remove:hover {
+    border-color: #e79ba3;
+    color: #e79ba3;
+  }
+}

@@ -8,6 +8,7 @@ import { invertName } from './names.js';
 import { describeFromOccupations, isAwkwardTerm, normalizeOccupation } from './normalize.js';
 import { extractDates, formatDateParens, PRIVACY_BIRTH_YEAR } from './dates.js';
 import { viafId, wikidataId } from './identifiers.js';
+import { applyFilters } from './filters.js';
 
 /** The default language. One constant, so reading 040 $b later is one line. */
 export const DEFAULT_LANG = 'en';
@@ -33,14 +34,18 @@ export const DEFAULT_LANG = 'en';
 
 /**
  * @param {{id: string, doc: XMLDocument, source: string}} rec
+ * @param {{textFilters?: import('./filters.js').TextFilter[]}} [opts]
  * @returns {WikidataDraft}
  */
-export function mapRecord(rec) {
+export function mapRecord(rec, opts = {}) {
   const warnings = [];
+  // The filters run on the text read from the record, before it is
+  // inverted or cased, so one filter covers the label and the aliases.
+  const filters = opts.textFilters ?? [];
 
-  const label = buildLabel(rec, warnings);
-  const aliases = buildAliases(rec, label, warnings);
-  const { description, descriptionSource } = buildDescription(rec, warnings);
+  const label = buildLabel(rec, warnings, filters);
+  const aliases = buildAliases(rec, label, warnings, filters);
+  const { description, descriptionSource } = buildDescription(rec, warnings, filters);
   const { birth, death, source: dateSource } = extractDates(rec);
 
   return {
@@ -65,9 +70,10 @@ export function mapRecord(rec) {
  * Make the label from the 100 authorized heading, in direct order.
  * @param {object} rec
  * @param {Warning[]} warnings
+ * @param {import('./filters.js').TextFilter[]} filters
  * @returns {string}
  */
-function buildLabel(rec, warnings) {
+function buildLabel(rec, warnings, filters = []) {
   const fields = datafields(rec, '100');
 
   if (fields.length === 0) {
@@ -89,9 +95,9 @@ function buildLabel(rec, warnings) {
   }
 
   const f = fields[0];
-  const parsed = invertName(subfield(f, 'a'), {
+  const parsed = invertName(applyFilters(subfield(f, 'a'), filters), {
     ind1: rawInd1(f),
-    titleWords: subfield(f, 'c'),
+    titleWords: applyFilters(subfield(f, 'c'), filters),
   });
 
   if (parsed.confidence === 'low') {
@@ -106,18 +112,19 @@ function buildLabel(rec, warnings) {
  * @param {object} rec
  * @param {string} label
  * @param {Warning[]} warnings
+ * @param {import('./filters.js').TextFilter[]} filters
  * @returns {string[]}
  */
-function buildAliases(rec, label, warnings) {
+function buildAliases(rec, label, warnings, filters = []) {
   const out = [];
   const seen = new Set();
   let uncertain = 0;
 
   for (const f of datafields(rec, '400')) {
     // The $w subfield gives the relation, not name text. It is not used.
-    const parsed = invertName(subfield(f, 'a'), {
+    const parsed = invertName(applyFilters(subfield(f, 'a'), filters), {
       ind1: rawInd1(f),
-      titleWords: subfield(f, 'c'),
+      titleWords: applyFilters(subfield(f, 'c'), filters),
     });
 
     const value = parsed.direct;
@@ -151,8 +158,10 @@ function buildAliases(rec, label, warnings) {
  * @param {Warning[]} warnings
  * @returns {{description: string, descriptionSource: 'occupation' | 'dates' | 'occupation+dates' | 'none'}}
  */
-function buildDescription(rec, warnings) {
-  const terms = datafields(rec, '374').flatMap((f) => subfields(f, 'a'));
+function buildDescription(rec, warnings, filters = []) {
+  const terms = datafields(rec, '374')
+    .flatMap((f) => subfields(f, 'a'))
+    .map((t) => applyFilters(t, filters));
   const occupations = terms.length ? describeFromOccupations(terms) : '';
 
   if (terms.length) {

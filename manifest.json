@@ -1,17 +1,19 @@
 {
   "manifest_version": 3,
   "name": "LCNAF2Wiki",
-  "version": "0.1.0",
-  "description": "Extracts MARC 100, 400 and 374 fields from LCNAF authority records.",
-  "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://id.loc.gov/*", "https://www.wikidata.org/*"],
-  "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"],
-    "type": "module"
-  },
+  "version": "0.2.0",
+  "description": "Turns an LCNAF authority record into a Wikidata item.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAndN9VAFvzoqezZgyyAYwQieHTI5Rmej/EoNPmp77Qg8EXXclDDcZoE9gP480uacIKDLaV5B+Rf5kaT3oO1pBLQYJOabC9kM0Ni4T6q+w+EvguSFOnKsIHFbJIgVaSAzN5SLEN6lHhCekTe2f8+nCWqQ6AJHlZ9dAuds5B/eL0UFVN1BZ79CQ1GGzn5p+HWCpU5LtdrdPiNGhEt+d8MT5xp2f7pQ5Qd2CtiwphOAY+7HtQs8+lvIlihjFQiX/P5+JkjbYdGjhnaZx6C7WI2VYEbEI0+WmUnCX1ghMIxPDvPGdzFMO0It/yOzzCWcvLgm9JGdx3y7zVwacqfxqht2G9wIDAQAB",
+  "permissions": ["activeTab", "storage", "identity"],
+  "host_permissions": [
+    "https://id.loc.gov/*",
+    "https://www.wikidata.org/*",
+    "https://query.wikidata.org/*",
+    "https://meta.wikimedia.org/*"
+  ],
   "action": {
-    "default_title": "LCNAF2Wiki"
+    "default_title": "LCNAF2Wiki",
+    "default_popup": "popup/popup.html"
   },
   "options_ui": {
     "page": "options/options.html",

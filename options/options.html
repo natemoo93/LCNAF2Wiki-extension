@@ -13,6 +13,77 @@
 
     <main>
       <section class="group">
+        <h2>Wikidata account</h2>
+
+        <p class="setting-note">
+          Optional. Items save either way. Signed out, an edit is credited to a
+          temporary account and capped at eight edits a minute; signed in, it is
+          credited to you and the cap is far higher.
+        </p>
+
+        <div id="account-state" class="account-state">
+          <p class="setting-note">Reading the sign-in…</p>
+        </div>
+
+        <details class="advanced">
+          <summary>Advanced</summary>
+
+          <div class="setting setting-block">
+            <span class="setting-text">
+              <span class="setting-name">A different OAuth client</span>
+              <span class="setting-note">
+                LCNAF2Wiki comes with a registered client, so this can stay empty.
+                Fill it in only to sign in through a different one, such as an
+                institutional client. Changing it signs you out.
+              </span>
+              <input
+                type="text"
+                id="client-id"
+                class="text-input"
+                placeholder="(using the built-in client)"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <span class="setting-note">
+                Callback address for a new client:
+                <code id="redirect-uri" class="redirect">(this browser gives no address)</code>
+                Register as non-owner-only and non-confidential, with the
+                <strong>Create, edit, and move pages</strong> grant.
+                <a id="register" href="#" target="_blank" rel="noreferrer">Register a client</a>
+              </span>
+            </span>
+          </div>
+        </details>
+
+      </section>
+
+      <section class="group">
+        <h2>How an item is saved</h2>
+
+        <label class="setting">
+          <input type="radio" name="save-method" value="api" />
+          <span class="setting-text">
+            <span class="setting-name">Save through the Wikidata API</span>
+            <span class="setting-note">
+              Create the item from the popup, after a confirm step showing what
+              will be written. The item is public as soon as it saves.
+            </span>
+          </span>
+        </label>
+
+        <label class="setting">
+          <input type="radio" name="save-method" value="form" />
+          <span class="setting-text">
+            <span class="setting-name">Open a prefilled form</span>
+            <span class="setting-note">
+              Open <strong>Special:NewItem</strong> with the fields filled in.
+              Nothing saves until you press Create there.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section class="group">
         <h2>Before creating an item</h2>
 
         <label class="setting">
@@ -20,50 +91,17 @@
           <span class="setting-text">
             <span class="setting-name">Check for duplicates first</span>
             <span class="setting-note">
-              Before unlocking <strong>Create in Wikidata</strong>, search Wikidata for an
-              item that already carries this LCNAF id in P244. An exact P244 match is
-              proof of a duplicate; a name match is not.
+              Search Wikidata for an existing item by P244, then VIAF, then name and
+              years. An identifier match is proof; a name match is not.
             </span>
             <span class="setting-note">
-              If Wikidata cannot be reached or rate-limits the request, the button
-              unlocks with a note to check by hand. A failed lookup is not evidence that
-              no item exists.
+              If the check fails, the button unlocks. A failed lookup is not evidence
+              that no item exists.
             </span>
           </span>
         </label>
       </section>
 
-      <section class="group">
-        <h2>Toolbar icon click</h2>
-
-        <label class="setting">
-          <input type="radio" name="click-action" value="menu" />
-          <span class="setting-text">
-            <span class="setting-name">Open the full menu</span>
-            <span class="setting-note">
-              Show the popup, so the MARC chips and the derived fields can be reviewed
-              and edited before anything reaches Wikidata.
-            </span>
-          </span>
-        </label>
-
-        <label class="setting">
-          <input type="radio" name="click-action" value="create" />
-          <span class="setting-text">
-            <span class="setting-name">Create in Wikidata instantly</span>
-            <span class="setting-note">
-              Skip the popup and open the prefilled <strong>Special:NewItem</strong>
-              form, to proofread the fields on Wikidata's own page. Nothing is saved
-              until Create is pressed there.
-            </span>
-            <span class="setting-note">
-              The popup opens instead when there is no LCNAF id in the page address, when
-              the record yields no label, when the duplicate check finds an item, or when
-              the fetch fails.
-            </span>
-          </span>
-        </label>
-      </section>
     </main>
 
     <footer>

@@ -499,6 +499,20 @@ footer a:hover {
   color: var(--info-fg);
 }
 
+/* A name and date match. The same amber as "entry exists", because both stop
+   the cataloguer, but the dashed border says the match is not proof. */
+.copy-possible {
+  border-style: dashed;
+  border-color: var(--info-line);
+  background: var(--info-bg);
+  color: var(--info-fg);
+}
+
+.copy-possible:hover {
+  border-color: var(--info-fg);
+  color: var(--info-fg);
+}
+
 /* ---- footer ---- */
 
 .linklike {
@@ -519,4 +533,179 @@ footer a:hover {
 .linklike:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ---- account, gate and confirm ---- */
+
+/* The signed-in account sits in the header, so the cataloguer always knows
+   which name an edit will carry. */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.account-name {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.account-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok-line);
+}
+
+/* The confirm step. A saved item cannot be taken back with one click, so
+   the write is shown in full before it happens. */
+.confirm {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.confirm-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.confirm-rows {
+  margin: 0 0 10px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 10px;
+  font-size: 11px;
+}
+
+.confirm-key {
+  color: var(--muted);
+}
+
+.confirm-value {
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.confirm-who {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* The result of a save. Green, because the item now exists. */
+.created {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--ok-line);
+  border-radius: 6px;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  font-size: 12px;
+}
+
+.created-id {
+  font-weight: 600;
+}
+
+.created a {
+  color: inherit;
+}
+
+/* A failed save. The draft stays on screen, so nothing typed is lost. */
+.save-error {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--warn-line);
+  border-radius: 6px;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ---- the diff ---- */
+
+/* An addition reads the way a diff does: a plus, a green ground, and the
+   value beside its field name. Nothing here is ever a removal, because the
+   tool only adds. */
+.diff {
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.diff-line {
+  display: grid;
+  grid-template-columns: 14px max-content 1fr;
+  gap: 0 8px;
+  align-items: baseline;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.diff-line:last-child {
+  border-bottom: 0;
+}
+
+/* Green, as a diff marks an addition. The plus carries the same meaning,
+   so the line stays readable without the colour. */
+.diff-add {
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+}
+
+.diff-keep {
+  background: transparent;
+  color: var(--muted);
+}
+
+.diff-mark {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  text-align: center;
+}
+
+.diff-name {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.diff-value {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+/* Why a line is not being added. It sits under the value, so the column
+   stays aligned. */
+.diff-note {
+  grid-column: 3;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* The button that adds to an item instead of creating one. Green, because
+   it only ever adds. */
+.copy-add {
+  border-color: var(--ok-line);
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+}
+
+.copy-add:hover {
+  border-color: var(--ok-fg);
 }

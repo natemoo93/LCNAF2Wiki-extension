@@ -1,0 +1,13 @@
+{
+  "name": "lcnaf2wiki-extension",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Turns an LCNAF authority record into a Wikidata item.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "^0.9.6"
+  }
+}

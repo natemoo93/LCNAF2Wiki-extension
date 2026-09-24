@@ -4,6 +4,7 @@ Turns an LCNAF authority record into the fields needed to create a Wikidata
 item: **Label**, **Description**, **Aliases**, and language. Each field is
 editable in place and copyable, with QuickStatements output for the whole item.
 
+
 ## Install (unpacked)
 
 One manifest serves both browsers. Chrome reads `background.service_worker`,
@@ -59,9 +60,71 @@ copying.
 
 | Button | What it does |
 |---|---|
-| **Create in Wikidata** | Opens `Special:NewItem` with label, description, aliases and language filled in. Nothing is saved until the cataloguer reviews the form and presses Create. |
-| **Copy all** | The four fields as labelled lines, plus the LCNAF id. |
+| **Create in Wikidata** | Saves the item through the REST API after a confirm step. With the form setting chosen, opens a prefilled `Special:NewItem` instead. |
 | **QuickStatements** | A v1 batch including a `P244` statement carrying the LCNAF id, so the new item records where it came from. |
+
+#### Saving through the API
+
+A save through the REST API is **immediate and public**. There is no review
+page between the click and the edit, so the extension puts one there: a confirm
+panel lists every value that will be written, says who the edit will be
+credited to, and waits. Nothing is sent until **Create item** is pressed.
+
+This works signed in or signed out. Signed out, the panel says the edit will
+carry a temporary account rather than a name.
+
+What a save writes:
+
+| Part | Value |
+|---|---|
+| Label, description, aliases | The fields as edited in the popup |
+| `P244` | The LCNAF id, referenced with `P248` (LC Name Authority File) and `P813` (retrieved) |
+| `P31` | `Q5`, human |
+| Edit summary | `Created from LCNAF <id> with LCNAF2Wiki` |
+
+Dates and occupations stay in the description and are **not** written as
+statements. A date needs a precision judgment the record does not carry, and an
+occupation needs a term-to-item mapping that an authority record does not
+supply. Writing either from a guess would put a wrong claim in a public
+database, which costs more to undo than to never make.
+
+
+#### Adding to an item that exists
+
+When the duplicate check finds an item, the tool reads it and compares. If the
+record holds nothing the item lacks, the button reads **Entry exists** and only
+opens it. If the record holds more, the button reads **Add to Q…** and offers
+the difference:
+
+```
+Add to Q42?
+
+    Label              Douglas Adams                    (already there)
+    Description        author, humorist (1952-2001)     (kept: British science
+                                                         fiction writer …)
+  + Alias              Adams, Douglas
+  + LCNAF ID (P244)    n80076765
+
+  [ Add ]   Open item ↗   [ Cancel ]
+```
+
+A line with a green `+` is written. A grey line is not, and says why.
+
+**The tool never removes anything.** A label, a description or a statement
+property the item already fills is left exactly as it is, even where the
+record disagrees, because the record is one source among several and the item
+can hold work the tool knows nothing about. Replacing a value is a judgment
+for a cataloguer on Wikidata, not for this tool.
+
+That rule is enforced three times over: the comparison only ever marks a field
+`add`, the patch is built only from additions, and `patchItem` refuses any
+operation that is not an `add` before the request leaves the extension. An
+alias is appended with the JSON Patch `/-` path, so an alias somebody adds
+between the read and the write is not lost.
+
+After a save the button reads the new Q-number and stays disabled, so a second
+press cannot make a duplicate. A failed save leaves the draft untouched, so
+nothing typed is lost; an expired sign-in says so and asks for another.
 
 All three read the fields at click time, so edits made in the popup are carried
 through.
@@ -74,51 +137,54 @@ immediately and take effect on the next click.
 
 | Setting | Default | What it does |
 |---|---|---|
-| **Check for duplicates first** | On | Before unlocking **Create in Wikidata**, search Wikidata for an item that already carries this LCNAF id in `P244`. |
+| **A different OAuth client** | (empty) | Under Advanced. Only for signing in through an institutional client. Refer to [Signing in](#signing-in). |
+| **How an item is saved** | Through the API | Whether **Create in Wikidata** saves through the REST API under your account, or opens a prefilled `Special:NewItem`. |
+| **Check for duplicates first** | On | Before unlocking **Create in Wikidata**, search Wikidata for an item that already carries this LCNAF id in `P244`, then for a person with the same name and years. |
 | **Toolbar icon click** | Open the full menu | Whether clicking the toolbar icon opens this popup, or goes straight to a prefilled `Special:NewItem`. |
 
-An exact `P244` match is proof of a duplicate; a name match is not, since two
-people can share a name. When a match is found, **Create in Wikidata** turns
+Changing the client id signs you out, because a token belongs to the client
+that issued it.
+
+The check runs in order, stopping at the first thing it finds:
+
+| Step | Searches | Strength |
+|---|---|---|
+| 1 | `P244` for the LCNAF id | Proof |
+| 2 | `P214` for the VIAF number from `024`, if the record carries one | Proof |
+| 3 | Label and both years, for an item with no `P244` | Evidence |
+
+An exact identifier match is proof of a duplicate; a name match is not, since
+two people can share a name.
+
+Step 2 exists because VIAF clusters LC with the national libraries. An item
+built from a German or French record carries the same VIAF number and often no
+`P244` at all, so the `P244` search cannot see it. Roughly a quarter of LCNAF
+records name a VIAF cluster in `024`; a record that names none skips the step.
+ When a match is found, **Create in Wikidata** turns
 amber and reads **Entry exists**, naming the matching item in its tooltip.
 A click opens that item in a new tab, so the cataloger can see the record that
-already exists.
+already exists. This holds for a save through the API too: when a match is
+found, the button is rebuilt so that the only thing it can do is open the item.
+A save cannot be pressed through a duplicate warning.
+
+When the `P244` search finds nothing, the tool tries a second check: the
+Wikidata query service looks for a person with the same label and both the
+same years, and with no `P244` of their own. This finds an item that someone
+made without this tool. Two people can share a name, so a hit here is evidence
+and not proof: the button turns amber with a dashed border and reads
+**Possible match ↗**, and the cataloguer opens the item and judges it.
+
+Both years must be present, and each may differ by one, because catalogues
+disagree about a birth or death year by a year often enough to matter. A
+record with no death year, such as a living person, skips this check, since a
+name and one year is too weak to show anyone.
 
 The check fails open. If Wikidata is unreachable, rate-limits the request, or
-does not answer within 6 seconds, the button returns to normal. A failed
-lookup is not evidence that no item exists, and must never block a legitimate
-record.
+does not answer in time, the button returns to normal. A failed lookup is not
+evidence that no item exists, and must never block a legitimate record.
 
 
 
-#### Toolbar icon click
-
-**Open the full menu** (default) shows this popup, so the MARC chips and the
-derived fields can be reviewed before anything reaches Wikidata.
-
-**Create in Wikidata instantly** skips the popup: one click on the icon fetches
-the record, maps it, and opens the prefilled `Special:NewItem` form, where the
-fields are proofread on Wikidata's own page. Nothing is saved until Create is
-pressed there.
-
-Instant mode falls back to opening this popup when it cannot act safely:
-
-- the page address carries no LCNAF id, so there is nothing to fetch;
-- the record yields no label, so the form would be empty;
-- the duplicate check is on and finds an existing item, so the **Entry exists**
-  button is shown instead;
-- the fetch or the mapping fails, so the error is shown.
-
-The mode is implemented by setting or clearing the action popup in
-`background.js`: a click opens a popup when one is set, and reaches the
-`onClicked` handler only when none is. The manifest deliberately declares no
-`default_popup`. If it did, the browser would open that popup before the
-service worker had read the setting, and instant mode would never fire.
-
-A service worker has no DOM, so `background.js` cannot use `DOMParser`. It
-reads the record with `core/marcLite.js` instead, a small dependency-free
-scanner. The popup keeps using `core/marc.js` and the browser's own parser. A
-corpus test asserts both readers produce the same draft for every sample
-record, so the icon and the popup can never disagree.
 
 ## What it shows
 
@@ -130,6 +196,9 @@ Below the derived fields, each MARC tag is one colour-coded chip:
 | **Grey** | Not in present this record. |
 | **Yellow** `i` | Present, but human review suggested.|
 | **Red** `!` | The record shape is a problem for building an item. |
+
+The `024` field is read but has no chip: it holds no name text, and what it
+contributes is the duplicate check rather than a field of the draft.
 
 A chip shows its count when a tag repeats (`400 ×3`). Hover or focus a chip to
 preview its detail; click to pin it open so the text can be read and copied.
@@ -152,10 +221,18 @@ core/                 no chrome.* APIs; runs under Node in tests
   quickstatements.js  QuickStatements v1 output
   newitem.js          prefilled Special:NewItem url
   lcClient.js         single-record fetch against id.loc.gov
-  wikidata.js         P244 duplicate check (fails open)
+  identifiers.js      024 external identifiers: VIAF and Wikidata
+  diff.js             what a record adds to an item that exists
+  wikidata.js         P244 and P214 duplicate check (fails open)
+  namematch.js        name and date check, for records with no P244 match
+  wikibase.js         REST API write client; refuses a write with no token
+  statements.js       draft -> P244 and P31 statements, with references
+  oauth.js            OAuth 2 with PKCE: URLs, challenge, token trade
+  auth.js             the session: storage, refresh, sign in and out
   settings.js         chrome.storage.sync settings, with defaults
 background.js         service worker: toolbar-icon click behaviour
 popup/                popup.html / .css / .js, the record UI
 options/              options.html / .css / .js, the settings page
 manifest.json
+package.json          the test runner and its one dev dependency
 ```

@@ -117,3 +117,124 @@ footer a {
   color: var(--muted);
   font-size: 11px;
 }
+
+/* ---- the account panel ---- */
+
+.account-state {
+  margin-bottom: 14px;
+}
+
+.account-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.btn {
+  padding: 5px 12px;
+  border: 1px solid var(--line, #d7dade);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--accent, #4e2a84);
+  color: var(--accent, #4e2a84);
+}
+
+.btn-primary {
+  border-color: var(--accent, #4e2a84);
+  background: var(--accent, #4e2a84);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  color: #fff;
+}
+
+/* A setting whose control sits under its text, not beside it. */
+.setting-block {
+  display: block;
+}
+
+.text-input {
+  display: block;
+  width: 100%;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line, #d7dade);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.text-input:focus-visible {
+  outline: 2px solid var(--accent, #4e2a84);
+  outline-offset: 1px;
+}
+
+/* The callback address. It is copied, so it is monospaced and selectable. */
+.redirect {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.14);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.state-ok {
+  color: #1d6b40;
+  font-weight: 600;
+}
+
+.state-warn {
+  color: #a02631;
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .state-ok {
+    color: #86d3a5;
+  }
+
+  .state-warn {
+    color: #e79ba3;
+  }
+}
+
+/* The advanced section. Collapsed, because nearly nobody needs it: the
+   extension carries its own registered client. */
+.advanced {
+  margin-top: 6px;
+  border-top: 1px solid var(--line, #e2e4e9);
+  padding-top: 8px;
+}
+
+.advanced summary {
+  font-size: 11px;
+  color: var(--muted, #61656e);
+  cursor: pointer;
+  user-select: none;
+}
+
+.advanced summary:hover {
+  color: var(--accent, #4e2a84);
+}
+
+.advanced[open] summary {
+  margin-bottom: 6px;
+}

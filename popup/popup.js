@@ -9,8 +9,13 @@ import { extractFields, idFromUrl, normalizeId } from '../core/extract.js';
 import { mapRecord } from '../core/mapper.js';
 import { toQuickStatements } from '../core/quickstatements.js';
 import { newItemUrl } from '../core/newitem.js';
-import { findDuplicates } from '../core/wikidata.js';
+import { findByViaf, findDuplicates } from '../core/wikidata.js';
+import { findNameMatches } from '../core/namematch.js';
 import { getSettings } from '../core/settings.js';
+import { getAccessToken, getSession } from '../core/auth.js';
+import { createItem, getItem, patchItem } from '../core/wikibase.js';
+import { buildStatements, summarize } from '../core/statements.js';
+import { buildAddPatch, diffAgainstItem, summarizeAdditions } from '../core/diff.js';
 
 /** Where the documentation link points. One constant, so it is one change. */
 const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
@@ -20,6 +25,14 @@ const input = document.getElementById('id');
 const button = document.getElementById('go');
 const out = document.getElementById('out');
 const optionsButton = document.getElementById('open-options');
+const accountBar = document.getElementById('account');
+
+/**
+ * The session as the popup last saw it. The draft panel reads this to decide
+ * whether saving is possible, so it is kept beside the settings.
+ * @type {import('../core/auth.js').SessionState}
+ */
+let session = { state: 'out' };
 
 /** Stops the fetch in operation when a second lookup starts. */
 let inFlight = null;
@@ -29,6 +42,10 @@ init();
 async function init() {
   input.focus();
   document.getElementById('docs').href = DOCS_URL;
+
+  // Read the session for the header. Sign-in is optional and lives in the
+  // settings, so nothing here asks for it.
+  await refreshSession();
 
   // The settings are on their own page in the extension manager. This button
   // opens that page.
@@ -93,6 +110,44 @@ async function lookup(id) {
   }
 }
 
+/* ---------- the account ---------- */
+
+/**
+ * Read the session and paint the header.
+ * Signing in is optional, and the settings page is where it happens, so
+ * this only reports who is signed in when somebody is.
+ */
+async function refreshSession() {
+  try {
+    session = await getSession();
+  } catch {
+    // An unreadable session reads as signed out, which fails safe.
+    session = { state: 'out' };
+  }
+  renderAccount();
+}
+
+/** The signed-in name in the header, or nothing when signed out. */
+function renderAccount() {
+  if (session.state !== 'in') {
+    accountBar.hidden = true;
+    accountBar.replaceChildren();
+    return;
+  }
+
+  accountBar.hidden = false;
+  accountBar.replaceChildren(
+    el('span', { class: 'account-dot', title: 'Signed in' }),
+    el('span', { class: 'account-name' }, session.account.username),
+  );
+}
+
+/**
+ * Paint the draft again with the session as it now is.
+ * Kept so a sign-out elsewhere can repaint the record on screen.
+ */
+let redrawDraft = () => {};
+
 /* ---------- rendering ---------- */
 
 function renderLoading(id) {
@@ -105,6 +160,9 @@ function renderLoading(id) {
  * @param {typeof import('../core/settings.js').DEFAULTS} settings
  */
 function renderRecord(record, draft, settings) {
+  // Signing in mid-record must unlock the save button without a refetch.
+  redrawDraft = () => renderRecord(record, draft, settings);
+
   const frag = document.createDocumentFragment();
 
   const head = el('div', { class: 'record-head' });
@@ -180,65 +238,428 @@ function renderDraft(draft, settings = {}) {
 
   const actions = el('div', { class: 'draft-actions' });
 
-  // Build the URL at click time, so it includes the edits.
-  const create = linkButton(
-    'Create in Wikidata',
-    () => newItemUrl(currentDraft(draft, inputs)),
-    'primary',
-  );
+  // Where the confirm step, the result and any failure are painted.
+  const stage = el('div', { class: 'stage' });
+
+  // Wikidata takes an item from a signed-out client too, so the API path
+  // does not need an account. Signing in changes who the edit is credited
+  // to, not whether it works. Only the setting chooses the path.
+  const savesByApi = settings.saveMethod !== 'form';
+
+  const create = savesByApi
+    ? button_('Create in Wikidata', () => {
+        // Read the fields at click time, so edits are carried through.
+        askToCreate(stage, currentDraft(draft, inputs), create);
+      }, 'primary')
+    : linkButton('Open prefilled form', () => newItemUrl(currentDraft(draft, inputs)), 'primary');
+
+  // Say which of the two the button does, because they save differently.
+  create.title = savesByApi
+    ? 'Save to Wikidata. A confirm step comes first.'
+    : 'Open a prefilled form. Nothing saves until you press Create there.';
 
   actions.append(
     create,
-    copyButton('Copy all', () => allFieldsText(draft, inputs)),
     copyButton('QuickStatements', () => toQuickStatements(currentDraft(draft, inputs))),
   );
-  wrap.append(actions);
+  wrap.append(actions, stage);
 
   // The check needs the setting on and an identifier to search for.
   if (settings.checkDuplicates && draft.lcnafId) {
-    guardCreate(create, draft.lcnafId);
+    guardCreate(create, draft, stage, () => currentDraft(draft, inputs));
   }
 
   return wrap;
 }
 
 /**
- * Lock the create button until the duplicate check is complete. A duplicate
- * makes it amber, and a click opens the item that holds this identifier.
- * Refer to the README for the fail-open rule.
+ * The access token, or nothing when signed out.
+ * A lapsed session must not stop a save, because the API takes the edit
+ * without one.
+ *
+ * @returns {Promise<string | undefined>}
+ */
+async function currentToken() {
+  if (session.state !== 'in') return undefined;
+  try {
+    return await getAccessToken();
+  } catch {
+    // The session lapsed. Save signed out rather than losing the work.
+    await refreshSession();
+    return undefined;
+  }
+}
+
+/**
+ * The confirm step. A saved item is public at once and cannot be taken back
+ * with one click, so the whole write is shown before it happens.
+ *
+ * @param {HTMLElement} stage
+ * @param {import('../core/mapper.js').WikidataDraft} draft
+ * @param {HTMLButtonElement} create
+ */
+function askToCreate(stage, draft, create) {
+  const panel = el('div', { class: 'confirm' });
+  panel.append(el('p', { class: 'confirm-title' }, 'Save this item to Wikidata?'));
+
+  const rows = el('div', { class: 'confirm-rows' });
+  for (const r of summarize(draft)) {
+    rows.append(el('span', { class: 'confirm-key' }, r.name));
+    rows.append(el('span', { class: 'confirm-value' }, r.value));
+  }
+  panel.append(rows);
+
+  panel.append(
+    el(
+      'p',
+      { class: 'confirm-who' },
+      session.state === 'in' ? `Saving as ${session.account.username}.` : 'Saving anonymously.',
+    ),
+  );
+
+  const go = button_('Create item', () => saveItem(stage, draft, create), 'primary');
+  panel.append(
+    el(
+      'div',
+      { class: 'confirm-actions' },
+      go,
+      button_('Cancel', () => stage.replaceChildren()),
+    ),
+  );
+
+  stage.replaceChildren(panel);
+  go.focus();
+}
+
+/**
+ * Write the item. The draft stays on screen whatever happens, so a failure
+ * loses nothing the cataloguer typed.
+ *
+ * @param {HTMLElement} stage
+ * @param {import('../core/mapper.js').WikidataDraft} draft
+ * @param {HTMLButtonElement} create
+ */
+async function saveItem(stage, draft, create) {
+  stage.replaceChildren(el('p', { class: 'loading' }, 'Saving to Wikidata…'));
+  create.disabled = true;
+
+  try {
+    // A token when one is available. Wikidata takes the edit either way,
+    // so a signed-out save goes ahead rather than stopping the cataloguer.
+    const token = await currentToken();
+    const item = await createItem(draft, { accessToken: token });
+
+    stage.replaceChildren(
+      el(
+        'div',
+        { class: 'created' },
+        'Created ',
+        el('span', { class: 'created-id' }, item.id),
+        '. ',
+        linkLike('Open in Wikidata ↗', () => openUrl(item.url)),
+      ),
+    );
+
+    // The item now exists, so a second press would make a duplicate.
+    create.textContent = 'Created ' + item.id;
+    create.disabled = true;
+  } catch (err) {
+    create.disabled = false;
+
+    // The sign-in lapsed between opening the popup and pressing save.
+    // The header is repainted so it stops naming an account that is gone.
+    if (err.code === 'signed-out') {
+      await refreshSession();
+      stage.replaceChildren(
+        el(
+          'div',
+          { class: 'save-error' },
+          'Sign-in expired. Press Create again to save anonymously.',
+        ),
+      );
+      return;
+    }
+
+    stage.replaceChildren(el('div', { class: 'save-error' }, err.message));
+  }
+}
+
+/**
+ * Lock the create button until the duplicate check is complete. A P244 match
+ * is proof and reads "Entry exists"; a name and date match is only evidence
+ * and reads "Possible match". Refer to the README for the fail-open rule.
  *
  * @param {HTMLButtonElement} button
- * @param {string} lcnafId
+ * @param {import('../core/mapper.js').WikidataDraft} draft
  */
-async function guardCreate(button, lcnafId) {
+async function guardCreate(button, draft, stage, readDraft) {
+  const lcnafId = draft.lcnafId;
   button.disabled = true;
 
   const result = await findDuplicates(lcnafId);
 
-  // No duplicate, or a check that did not complete. Fail open.
-  if (result.status !== 'duplicate') {
-    button.disabled = false;
-    return;
+  if (result.status === 'duplicate') {
+    const [first] = result.items;
+    // An address is necessary to open the item, so without one, fail open.
+    if (first?.url) {
+      const found = result.items.map((i) => i.id).join(', ');
+      await offerExisting(button, stage, readDraft, {
+        itemId: first.id,
+        url: first.url,
+        title: found
+          ? `Already in Wikidata as ${found}, matched on P244 ${lcnafId}.`
+          : `Already in Wikidata, matched on P244 ${lcnafId}.`,
+      });
+      return;
+    }
   }
 
-  // A duplicate. The search gives a page address for each item it found.
-  // An address is necessary to open the item, so without one, fail open.
-  const [first] = result.items;
-  if (!first?.url) {
-    button.disabled = false;
-    return;
+  // No P244 match. The record can still name a VIAF cluster, and an item
+  // built from another library's record carries that number and no P244.
+  // A VIAF match is an exact identifier match, so it is proof, like P244.
+  if (result.status === 'none' && draft.viafId) {
+    const byViaf = await findByViaf(draft.viafId);
+    const [first] = byViaf.items;
+
+    if (byViaf.status === 'duplicate' && first?.url) {
+      const found = byViaf.items.map((i) => i.id).join(', ');
+      await offerExisting(button, stage, readDraft, {
+        itemId: first.id,
+        url: first.url,
+        title: `Already in Wikidata as ${found}, matched on VIAF ${draft.viafId}.`,
+      });
+      return;
+    }
   }
-  const found = result.items.map((i) => i.id).join(', ');
+
+  // No identifier match. An item made without this tool can hold the same
+  // person and no identifier at all, so try the name and the years next.
+  if (result.status === 'none') {
+    const byName = await findNameMatches(draft);
+    const [first] = byName.items;
+
+    if (byName.status === 'possible' && first?.url) {
+      const found = byName.items.map((i) => i.id).join(', ');
+      markFound(button, {
+        label: 'Possible match ↗',
+        variant: 'copy-possible',
+        url: first.url,
+        title: `${found} has this name and years (${first.birth}–${first.death}), but no P244.`,
+      });
+      return;
+    }
+  }
+
+  // Nothing found, or a check that did not complete. Fail open.
   button.disabled = false;
-  button.textContent = 'Entry exists ↗';
-  button.className = 'copy copy-exists';
-  button.title = found
-    ? `Already in Wikidata as ${found} (P244 ${lcnafId}). Click to open the item.`
-    : `Already in Wikidata (P244 ${lcnafId}). Click to open the item.`;
+}
 
+/**
+ * An item already exists. Read it, and see whether the record holds anything
+ * it does not. With something to add the button offers to add it; with
+ * nothing, it only opens the item.
+ *
+ * @param {HTMLButtonElement} button
+ * @param {HTMLElement} stage
+ * @param {() => import('../core/mapper.js').WikidataDraft} readDraft
+ * @param {{itemId: string, url: string, title: string}} found
+ */
+async function offerExisting(button, stage, readDraft, found) {
+  let item;
+  try {
+    item = await getItem(found.itemId);
+  } catch {
+    // The item cannot be read, so there is nothing to compare. Fall back to
+    // opening it, which is what the tool did before.
+    markFound(button, {
+      label: 'Entry exists ↗',
+      variant: 'copy-exists',
+      url: found.url,
+      title: found.title,
+    });
+    return;
+  }
+
+  const draft = readDraft();
+  const diff = diffAgainstItem(draft, item, buildStatements(draft));
+
+  if (!diff.hasAdditions) {
+    markFound(button, {
+      label: 'Entry exists ↗',
+      variant: 'copy-exists',
+      url: found.url,
+      title: `${found.title} Nothing in this record to add.`,
+    });
+    return;
+  }
+
+  // There is something to add. The button offers that instead of opening.
+  markAddable(button, stage, {
+    ...found,
+    diff,
+    lang: draft.lang,
+    lcnafId: draft.lcnafId,
+  });
+}
+
+/**
+ * Point the button at adding to the item that exists.
+ *
+ * @param {HTMLButtonElement} button
+ * @param {HTMLElement} stage
+ * @param {object} found
+ */
+function markAddable(button, stage, found) {
+  button.disabled = false;
+  button.textContent = `Add to ${found.itemId}`;
+  button.className = 'copy copy-add';
+  button.title = `${found.title} This record adds ${summarizeAdditions(found.diff)}.`;
+
+  // Replacing the node drops the create handler, so the button can no
+  // longer write a duplicate item.
+  const fresh = button.cloneNode(true);
+  fresh.addEventListener('click', () => askToAdd(stage, found, fresh));
+  button.replaceWith(fresh);
+}
+
+/**
+ * The confirm step for adding to an item. Every line that will be written
+ * is marked with a plus and a green ground, the way a diff reads. Lines
+ * already on the item are shown grey, so it is clear nothing is replaced.
+ *
+ * @param {HTMLElement} stage
+ * @param {object} found
+ * @param {HTMLButtonElement} button
+ */
+function askToAdd(stage, found, button) {
+  const panel = el('div', { class: 'confirm' });
+  panel.append(el('p', { class: 'confirm-title' }, `Add to ${found.itemId}?`));
+
+  const diffBox = el('div', { class: 'diff' });
+
+  for (const change of found.diff.additions) {
+    diffBox.append(diffLine(change));
+  }
+
+  panel.append(diffBox);
+
+  panel.append(
+    el(
+      'p',
+      { class: 'confirm-who' },
+      session.state === 'in' ? `Saving as ${session.account.username}.` : 'Saving anonymously.',
+    ),
+  );
+
+  const go = button_('Add', () => addToItem(stage, found, button), 'primary');
+  panel.append(
+    el(
+      'div',
+      { class: 'confirm-actions' },
+      go,
+      linkLike('Open item ↗', () => openUrl(found.url)),
+      button_('Cancel', () => stage.replaceChildren()),
+    ),
+  );
+
+  stage.replaceChildren(panel);
+  go.focus();
+}
+
+/**
+ * One line of the diff. An addition is green with a plus; anything else is
+ * shown plainly, because it is not being touched.
+ *
+ * @param {import('../core/diff.js').FieldChange} change
+ */
+function diffLine(change) {
+  const added = change.status === 'add';
+
+  const line = el('div', { class: added ? 'diff-line diff-add' : 'diff-line diff-keep' });
+
+  line.append(el('span', { class: 'diff-mark' }, added ? '+' : ' '));
+  line.append(el('span', { class: 'diff-name' }, change.name));
+  line.append(el('span', { class: 'diff-value' }, change.value ?? ''));
+
+  // Say why a line is not being added, so the rule is visible.
+  if (!added) {
+    const why =
+      change.status === 'same'
+        ? 'already there'
+        : `kept: ${change.existing || 'existing value'}`;
+    line.append(el('span', { class: 'diff-note' }, why));
+  }
+
+  return line;
+}
+
+/**
+ * Write the additions. The item keeps everything it had.
+ *
+ * @param {HTMLElement} stage
+ * @param {object} found
+ * @param {HTMLButtonElement} button
+ */
+async function addToItem(stage, found, button) {
+  stage.replaceChildren(el('p', { class: 'loading' }, `Adding to ${found.itemId}…`));
+  button.disabled = true;
+
+  const body = buildAddPatch(found.diff, found.lang, found.lcnafId);
+
+  try {
+    const token = await currentToken();
+    await patchItem(found.itemId, body.patch, {
+      accessToken: token,
+      comment: body.comment,
+    });
+
+    stage.replaceChildren(
+      el(
+        'div',
+        { class: 'created' },
+        `Added to ${found.itemId}. `,
+        linkLike('Open in Wikidata ↗', () => openUrl(found.url)),
+      ),
+    );
+
+    button.textContent = `Added to ${found.itemId}`;
+    button.disabled = true;
+  } catch (err) {
+    button.disabled = false;
+
+    if (err.code === 'signed-out') {
+      await refreshSession();
+      stage.replaceChildren(
+        el('div', { class: 'save-error' }, 'Sign-in expired. Press Add again to save anonymously.'),
+      );
+      return;
+    }
+
+    stage.replaceChildren(el('div', { class: 'save-error' }, err.message));
+  }
+}
+
+/**
+ * Point the create button at an item that already exists.
+ *
+ * @param {HTMLButtonElement} button
+ * @param {{label: string, variant: string, url: string, title: string}} found
+ */
+function markFound(button, found) {
+  button.disabled = false;
+  button.textContent = found.label;
+  button.className = `copy ${found.variant}`;
+  button.title = found.title;
   // The button now points at the item that exists. linkButton reads this
   // address instead of the create address, so only one tab opens.
-  button.dataset.overrideUrl = first.url;
+  button.dataset.overrideUrl = found.url;
+
+  // A save button carries its own click handler and would otherwise still
+  // write a duplicate. Replacing the node drops every handler on it, so the
+  // only thing the button can now do is open the item that exists.
+  const fresh = button.cloneNode(true);
+  fresh.addEventListener('click', () => openUrl(found.url));
+  button.replaceWith(fresh);
 }
 
 /**
@@ -275,6 +696,36 @@ function draftRow(spec, warnings) {
   }
 
   return { row, field };
+}
+
+/**
+ * A plain button that runs a function. linkButton opens an address; this one
+ * acts in the popup.
+ *
+ * @param {string} label
+ * @param {() => void} onClick
+ * @param {string} [variant]
+ */
+function button_(label, onClick, variant) {
+  const btn = el(
+    'button',
+    { type: 'button', class: variant ? `copy copy-${variant}` : 'copy' },
+    label,
+  );
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+/**
+ * A button styled as a link, for a secondary action.
+ *
+ * @param {string} label
+ * @param {() => void} onClick
+ */
+function linkLike(label, onClick) {
+  const btn = el('button', { type: 'button', class: 'linklike' }, label);
+  btn.addEventListener('click', onClick);
+  return btn;
 }
 
 /**
@@ -359,18 +810,6 @@ function currentDraft(draft, inputs) {
       .map((s) => s.trim())
       .filter(Boolean),
   };
-}
-
-/** All the fields as lines with labels, to paste into a notes field. */
-function allFieldsText(draft, inputs) {
-  const d = currentDraft(draft, inputs);
-  return [
-    `Label: ${d.label}`,
-    `Description: ${d.description}`,
-    `Aliases: ${d.aliases.join('|')}`,
-    `Language: ${d.lang}`,
-    `LCNAF: ${d.lcnafId}`,
-  ].join('\n');
 }
 
 /**

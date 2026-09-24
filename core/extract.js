@@ -4,12 +4,14 @@
  */
 
 import { datafields, subfields, subfield, allSubfields, indicators, controlfield } from './marc.js';
+import { describeRelated, extractRelated, relatedNote } from './related.js';
 
 /** The MARC tags that this prototype reads, with labels for the UI. */
 export const TAGS = [
   { tag: '100', name: 'Personal name (authorized heading)' },
   { tag: '400', name: 'See-from tracing (variant name)' },
   { tag: '374', name: 'Occupation' },
+  { tag: '500', name: 'See-also tracing (related identity)' },
 ];
 
 /**
@@ -103,6 +105,14 @@ function assess(tag, fields, rec) {
     }
   }
 
+  if (tag === '500' && fields.length) {
+    // Always yellow. A related identity is never acted on by the tool, and
+    // always worth a cataloguer's eye: it can be a pseudonym of this person
+    // or a different person entirely.
+    notable = true;
+    messages.push(...describeRelated(extractRelated(rec), relatedNote(rec)));
+  }
+
   if (fields.length === 0 && !attention) {
     messages.push(ABSENT_NOTE[tag] ?? 'Not present in this record.');
   }
@@ -120,6 +130,7 @@ function assess(tag, fields, rec) {
 const ABSENT_NOTE = {
   374: 'No occupation.',
   400: 'No variant names.',
+  500: 'No related identities.',
 };
 
 /**

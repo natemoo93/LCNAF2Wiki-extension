@@ -7,6 +7,7 @@ import { datafields, subfields, subfield, indicators } from './marc.js';
 import { invertName } from './names.js';
 import { describeFromOccupations, isAwkwardTerm, normalizeOccupation } from './normalize.js';
 import { extractDates, formatDateParens, PRIVACY_BIRTH_YEAR } from './dates.js';
+import { viafId, wikidataId } from './identifiers.js';
 
 /** The default language. One constant, so reading 040 $b later is one line. */
 export const DEFAULT_LANG = 'en';
@@ -15,6 +16,8 @@ export const DEFAULT_LANG = 'en';
  * @typedef {{code: string, field?: string, detail?: string}} Warning
  * @typedef {{
  *   lcnafId: string,
+ *   viafId?: string,
+ *   wikidataId?: string,
  *   lang: string,
  *   label: string,
  *   aliases: string[],
@@ -42,6 +45,9 @@ export function mapRecord(rec) {
 
   return {
     lcnafId: rec.id,
+    // From 024. Either can be absent, and most records carry neither.
+    viafId: viafId(rec),
+    wikidataId: wikidataId(rec),
     lang: DEFAULT_LANG,
     label,
     aliases,

@@ -9,14 +9,14 @@
  */
 export const DEFAULTS = {
   checkDuplicates: true,
-  clickAction: 'menu',
+  saveMethod: 'api',
 };
 
 /**
- * What a click on the toolbar icon does: 'menu' opens the popup, 'create'
- * opens a prefilled Special:NewItem. Refer to the README.
+ * How an item reaches Wikidata: 'api' saves it from the popup, after the
+ * confirm step; 'form' opens a prefilled Special:NewItem instead.
  */
-export const CLICK_ACTIONS = ['menu', 'create'];
+export const SAVE_METHODS = ['api', 'form'];
 
 /** Holds the settings when chrome.storage is not available. */
 let memory = { ...DEFAULTS };
@@ -45,8 +45,8 @@ export async function getSettings() {
 }
 
 /**
- * Replace an incorrect stored value with its default. An incorrect clickAction
- * would leave no button selected and the worker with no behaviour.
+ * Replace an incorrect stored value with its default, so a damaged store
+ * cannot leave a control with nothing selected.
  *
  * @param {typeof DEFAULTS} s
  * @returns {typeof DEFAULTS}
@@ -55,7 +55,7 @@ function clean(s) {
   return {
     checkDuplicates:
       typeof s.checkDuplicates === 'boolean' ? s.checkDuplicates : DEFAULTS.checkDuplicates,
-    clickAction: CLICK_ACTIONS.includes(s.clickAction) ? s.clickAction : DEFAULTS.clickAction,
+    saveMethod: SAVE_METHODS.includes(s.saveMethod) ? s.saveMethod : DEFAULTS.saveMethod,
   };
 }
 

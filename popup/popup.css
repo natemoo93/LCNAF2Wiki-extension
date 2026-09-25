@@ -214,6 +214,13 @@ main {
   background: var(--warn-bg);
 }
 
+.draft-note {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .draft-warn {
   margin: 3px 0 0;
   font-size: 11px;

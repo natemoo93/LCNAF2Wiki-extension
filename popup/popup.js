@@ -94,7 +94,10 @@ async function lookup(id) {
 
     const rec = parseMarcXml(xml, id);
     const settings = await getSettings();
-    const draft = mapRecord(rec, { textFilters: settings.textFilters });
+    const draft = mapRecord(rec, {
+      textFilters: settings.textFilters,
+      excludeRomanized: settings.excludeRomanized,
+    });
     renderRecord(extractFields(rec), draft, settings);
   } catch (err) {
     if (ctl.signal.aborted || err.name === 'AbortError') return;
@@ -220,6 +223,12 @@ function renderDraft(draft, settings = {}) {
   for (const f of fields) {
     const { row, field } = draftRow(f, byField[f.key] ?? []);
     inputs[f.key] = field;
+    // List the excluded romanizations, so that the user can copy one into the field.
+    if (f.key === 'aliases' && draft.excludedAliases?.length) {
+      row.append(
+        el('p', { class: 'draft-note' }, `Excluded romanizations: ${draft.excludedAliases.join('|')}`),
+      );
+    }
     wrap.append(row);
   }
 
@@ -551,17 +560,16 @@ function diffLine(change) {
 
   line.append(el('span', { class: 'diff-mark' }, added ? '+' : ' '));
   line.append(el('span', { class: 'diff-name' }, change.name));
-  line.append(el('span', { class: 'diff-value' }, change.value ?? ''));
+  // The value column always shows the value that the item will have.
+  // For a kept line, that is the item's value, not the record's value.
+  const kept = change.status === 'kept';
+  const shown = kept ? change.existing || '(existing value)' : change.value;
+  line.append(el('span', { class: 'diff-value' }, shown ?? ''));
 
-  // Tell the user why the tool does not add this line.
+  // Mark a line that the tool does not change. Show the language of a match in a different language.
   if (!added) {
-    const why =
-      change.status === 'same'
-        ? change.matchLang
-          ? `already there (${change.matchLang})`
-          : 'already there'
-        : `kept: ${change.existing || 'existing value'}`;
-    line.append(el('span', { class: 'diff-note' }, why));
+    const note = change.matchLang ? `Unchanged (${change.matchLang})` : 'Unchanged';
+    line.append(el('span', { class: 'diff-note' }, note));
   }
 
   return line;

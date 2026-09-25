@@ -8,6 +8,7 @@ import { cleanFilters } from './filters.js';
 /** The default value of each setting. */
 export const DEFAULTS = {
   checkDuplicates: true,
+  excludeRomanized: true,
   saveMethod: 'api',
   textFilters: [],
 };
@@ -51,6 +52,8 @@ function clean(s) {
   return {
     checkDuplicates:
       typeof s.checkDuplicates === 'boolean' ? s.checkDuplicates : DEFAULTS.checkDuplicates,
+    excludeRomanized:
+      typeof s.excludeRomanized === 'boolean' ? s.excludeRomanized : DEFAULTS.excludeRomanized,
     saveMethod: SAVE_METHODS.includes(s.saveMethod) ? s.saveMethod : DEFAULTS.saveMethod,
     textFilters: cleanFilters(s.textFilters),
   };

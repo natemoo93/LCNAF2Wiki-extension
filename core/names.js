@@ -123,6 +123,27 @@ export function stripTrailingPunct(raw) {
   return s.replace(TRAILING_PUNCT, '').trim();
 }
 
+/** ALA-LC romanization marks: modifier letters, and macron, breve, dot, and tie accents. */
+const ROMANIZATION_MARKS = /[\u02B9-\u02BC]|[\u0304\u0306\u0307\u0323\u0331\u0361\uFE20-\uFE23]/u;
+
+/** Vietnamese marks. Vietnamese names use breve and dot below, but they are not romanizations. */
+const VIETNAMESE_MARKS = /[\u0303\u0309\u031B\u0110\u0111]/u;
+
+/**
+ * Return true if a name looks like an ALA-LC romanization, such as "Mārk Tuwayn".
+ * The name must have only Latin letters, so that a mark on a Cyrillic letter does not count.
+ * @param {string} name
+ * @returns {boolean}
+ */
+export function looksRomanized(name) {
+  const text = String(name ?? '').normalize('NFD');
+  // Ignore modifier letters such as ʻ. They are romanization marks, not letters of a script.
+  const letters = (text.match(/\p{L}/gu) ?? []).filter((c) => !/\p{Lm}/u.test(c));
+  if (!letters.length || !letters.every((c) => /\p{Script=Latin}/u.test(c))) return false;
+  if (VIETNAMESE_MARKS.test(text)) return false;
+  return ROMANIZATION_MARKS.test(text);
+}
+
 /** Function words that occur in titles and epithets but not in forenames. */
 const EPITHET_WORDS = /\b(of|de|del|della|di|van|von|the|d')\b/i;
 

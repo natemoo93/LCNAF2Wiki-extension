@@ -22,6 +22,7 @@ const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
 const GRANTS_URL = 'https://meta.wikimedia.org/wiki/Special:OAuthManageMyGrants';
 
 const dupToggle = document.getElementById('check-duplicates');
+const romanizedToggle = document.getElementById('exclude-romanized');
 const saveRadios = document.querySelectorAll('input[name="save-method"]');
 const clientInput = document.getElementById('client-id');
 const accountState = document.getElementById('account-state');
@@ -53,6 +54,11 @@ async function init() {
   dupToggle.checked = settings.checkDuplicates;
   dupToggle.addEventListener('change', () => {
     setSetting('checkDuplicates', dupToggle.checked);
+  });
+
+  romanizedToggle.checked = settings.excludeRomanized;
+  romanizedToggle.addEventListener('change', () => {
+    setSetting('excludeRomanized', romanizedToggle.checked);
   });
 
   for (const radio of saveRadios) {

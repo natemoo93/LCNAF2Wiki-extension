@@ -4,7 +4,7 @@
  */
 
 import { datafields, subfields, subfield, indicators } from './marc.js';
-import { invertName } from './names.js';
+import { invertName, looksRomanized } from './names.js';
 import { describeFromOccupations, isAwkwardTerm, normalizeOccupation } from './normalize.js';
 import { extractDates, formatDateParens, PRIVACY_BIRTH_YEAR } from './dates.js';
 import { viafId, wikidataId } from './identifiers.js';
@@ -22,6 +22,7 @@ export const DEFAULT_LANG = 'en';
  *   lang: string,
  *   label: string,
  *   aliases: string[],
+ *   excludedAliases: string[],
  *   description: string,
  *   birth?: object,
  *   death?: object,
@@ -34,7 +35,7 @@ export const DEFAULT_LANG = 'en';
 
 /**
  * @param {{id: string, doc: XMLDocument, source: string}} rec
- * @param {{textFilters?: import('./filters.js').TextFilter[]}} [opts]
+ * @param {{textFilters?: import('./filters.js').TextFilter[], excludeRomanized?: boolean}} [opts]
  * @returns {WikidataDraft}
  */
 export function mapRecord(rec, opts = {}) {
@@ -44,7 +45,7 @@ export function mapRecord(rec, opts = {}) {
   const filters = opts.textFilters ?? [];
 
   const label = buildLabel(rec, warnings, filters);
-  const aliases = buildAliases(rec, label, warnings, filters);
+  const { aliases, excludedAliases } = buildAliases(rec, label, warnings, filters, opts.excludeRomanized);
   const { description, descriptionSource } = buildDescription(rec, warnings, filters);
   const { birth, death, source: dateSource } = extractDates(rec);
 
@@ -56,6 +57,7 @@ export function mapRecord(rec, opts = {}) {
     lang: DEFAULT_LANG,
     label,
     aliases,
+    excludedAliases,
     description,
     birth,
     death,
@@ -113,22 +115,33 @@ function buildLabel(rec, warnings, filters = []) {
  * @param {string} label
  * @param {Warning[]} warnings
  * @param {import('./filters.js').TextFilter[]} filters
- * @returns {string[]}
+ * @param {boolean} excludeRomanized
+ * @returns {{aliases: string[], excludedAliases: string[]}}
  */
-function buildAliases(rec, label, warnings, filters = []) {
+function buildAliases(rec, label, warnings, filters = [], excludeRomanized = false) {
   const out = [];
+  const excluded = [];
   const seen = new Set();
   let uncertain = 0;
 
   for (const f of datafields(rec, '400')) {
     // Do not use $w. It gives the relation, not name text.
-    const parsed = invertName(applyFilters(subfield(f, 'a'), filters), {
+    const raw = subfield(f, 'a');
+    const filtered = applyFilters(raw, filters);
+    const parsed = invertName(filtered, {
       ind1: rawInd1(f),
       titleWords: applyFilters(subfield(f, 'c'), filters),
     });
 
     const value = parsed.direct;
     if (!value) continue;
+
+    // Exclude a romanization. Keep it if a text filter changed it, because the user wrote that filter.
+    if (excludeRomanized && filtered === raw && looksRomanized(value)) {
+      if (!excluded.includes(value)) excluded.push(value);
+      continue;
+    }
+
     if (parsed.confidence === 'low') uncertain++;
 
     // Skip an alias that is the same as the label.
@@ -147,7 +160,7 @@ function buildAliases(rec, label, warnings, filters = []) {
     });
   }
 
-  return out;
+  return { aliases: out, excludedAliases: excluded };
 }
 
 /**

@@ -5,8 +5,7 @@ Turns an LCNAF authority record into the fields needed to create a Wikidata item
 
 ## Install (unpacked)
 
-One manifest serves both browsers. Chrome reads `background.service_worker`,
-Firefox reads `background.scripts`, and each ignores the other's key.
+One manifest serves both browsers. Chrome reads `background.service_worker`, Firefox reads `background.scripts`, and each ignores the other's key.
 
 ### Chrome or Edge
 
@@ -30,8 +29,7 @@ No build step. The source is plain ES modules and loads as-is; edits take effect
 
 Either:
 
-- Navigate to any `id.loc.gov/authorities/names/…` page and open the popup.
-  The identifier is detected from the URL and fetched automatically; or
+- Navigate to any `id.loc.gov/authorities/names/…` page and open the popup. The identifier is detected from the URL and fetched automatically
 - Open the popup anywhere and type an identifier (`n50044114`).
 
 
@@ -45,8 +43,7 @@ Either:
 | **Aliases** | `400 $a` | Same inversion as the label, deduplicated, pipe-separated. Any alias identical to the label is dropped. |
 | **Language** | (none) | `en` by default. |
 
-Dates come from `046 $f`/`$g` when present and fall back to
-`100 $d`.
+Dates come from `046 $f`/`$g` when present and fall back to `100 $d`.
 
 Values that need a person's judgment, such as a `$c` title, are produced flagged and editable before copying.
 
@@ -100,10 +97,9 @@ Settings can be adjusted on: **Extensions → LCNAF2Wiki → Details → Extensi
 | Setting | Default | What it does |
 |---|---|---|
 | **Text filters** | (none) | Under Advanced. Replace text as it is read from the record. Refer to [Text filters](#text-filters). |
-| **A different OAuth client** | (empty) | Under Advanced. Only for signing in through an institutional client. Refer to [Signing in](#signing-in). |
+| **A different OAuth client** | (empty) | Under Advanced. Will be expanded once an OAuth consumer token is granted for this extension. |
 | **How an item is saved** | Through the API | Whether **Create in Wikidata** saves through the REST API under your account, or opens a prefilled `Special:NewItem`. |
-| **Check for duplicates first** | On | Before unlocking **Create in Wikidata**, search Wikidata for an item that already carries this LCNAF id in `P244`, then for a person with the same name and years. |
-| **Toolbar icon click** | Open the full menu | Whether clicking the toolbar icon opens this popup, or goes straight to a prefilled `Special:NewItem`. |
+| **Check for duplicates first** | On | Before unlocking **Create in Wikidata**, search Wikidata for an item that already exists. |
 
 Changing the client id signs you out, because a token belongs to the client that issued it.
 
@@ -116,8 +112,7 @@ The check runs in order, stopping at the first thing it finds:
 | 3 | Label and both years, for an item with no `P244` or `P214` | Evidence |
 
 
-When a match is found, **Create in Wikidata** turns yellow and reads **Entry exists** or **Add to Entry**, naming the matching item in its tooltip. When the `P244` search finds nothing, the Wikidata query service looks for a person with the same label and both years, and with no `P244` of their own. If one is found, the button turns amber with a dashed border and reads **Possible match ↗**, and the cataloguer opens the item and judges it.
-
+When a match is found, **Create in Wikidata** turns yellow and reads **Entry exists** or **Add to Entry**, naming the matching item in its tooltip. When the `P244` search finds nothing, the Wikidata query service looks for a person with the same label and both years, and with no `P244` of their own. If one is found, the button turns amber with a dashed border and reads **Possible match**.
 
 ## What it shows
 
@@ -145,14 +140,12 @@ replace: [ ﷽              ]   with: [                 ]  ×
                                            + Add a filter
 ```
 
-Filters run in order against the name, the variant names and the occupations, before the fields are built, so one filter covers the label and every alias that holds the same text.
-
-Filters do not touch the MARC chips, which show the record as it arrived. A value the tool changed and the chip that shows the original can be compared side by side.
+Filters run in order against the name, the variant names and the occupations, before the fields are built, so one filter covers the label and every alias that holds the same text. Filters do not touch the MARC chips, which show the record as it arrived. A value the tool changed and the chip that shows the original can be compared side by side.
 
 ## Layout
 
 ```
-core/                 no chrome.* APIs; runs under Node in tests
+core/                 no chrome.* APIs 
   marc.js             MARCXML primitives (parse, datafields, subfields, indicators)
   marcLite.js         DOM-free MARCXML reader for the service worker
   extract.js          passive 100/400/374 extraction + chip status
@@ -166,9 +159,9 @@ core/                 no chrome.* APIs; runs under Node in tests
   filters.js          literal find-and-replace over the record text
   identifiers.js      024 external identifiers: VIAF and Wikidata
   diff.js             what a record adds to an item that exists
-  wikidata.js         P244 and P214 duplicate check (fails open)
-  namematch.js        name and date check, for records with no P244 match
-  wikibase.js         REST API write client; refuses a write with no token
+  wikidata.js         P244 and P214 duplicate check
+  namematch.js        name and date check, for records with no P244 or VIAF match
+  wikibase.js         REST API write client
   statements.js       draft -> P244 and P31 statements, with references
   oauth.js            OAuth 2 with PKCE: URLs, challenge, token trade
   auth.js             the session: storage, refresh, sign in and out
@@ -177,5 +170,4 @@ background.js         service worker: toolbar-icon click behaviour
 popup/                popup.html / .css / .js, the record UI
 options/              options.html / .css / .js, the settings page
 manifest.json
-package.json          the test runner and its one dev dependency
 ```

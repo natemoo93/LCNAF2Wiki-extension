@@ -1,8 +1,6 @@
 # LCNAF2Wiki Browser Extension
 
-Turns an LCNAF authority record into the fields needed to create a Wikidata
-item: **Label**, **Description**, **Aliases**, and language. Each field is
-editable in place and copyable, with QuickStatements output for the whole item.
+Turns an LCNAF authority record into the fields needed to create a Wikidata item: **Label**, **Description**, **Aliases**, and language. Each field is editable in place and copyable, with QuickStatements output for the whole item.
 
 
 ## Install (unpacked)
@@ -24,11 +22,9 @@ Firefox reads `background.scripts`, and each ignores the other's key.
 3. Select `manifest.json` inside this folder, or a packaged `.zip`.
 4. Pin the extension so its toolbar button is visible.
 
-Firefox 115 or later is required. A temporary add-on is removed when Firefox
-closes, so repeat these steps each session until the add-on is signed.
+Firefox 115 or later is required. A temporary add-on is removed when Firefox closes, so repeat these steps each session until the add-on is signed.
 
-No build step. The source is plain ES modules and loads as-is; edits take effect
-after **Reload** on the extensions page.
+No build step. The source is plain ES modules and loads as-is; edits take effect after **Reload** on the extensions page.
 
 ## Use
 
@@ -38,7 +34,6 @@ Either:
   The identifier is detected from the URL and fetched automatically; or
 - Open the popup anywhere and type an identifier (`n50044114`).
 
-Internal spaces are stripped automatically, so `n  83053245` works.
 
 ## What it produces
 
@@ -53,8 +48,7 @@ Internal spaces are stripped automatically, so `n  83053245` works.
 Dates come from `046 $f`/`$g` when present and fall back to
 `100 $d`.
 
-Values that need a person's judgment, such as a `$c` title, are produced flagged and editable before
-copying.
+Values that need a person's judgment, such as a `$c` title, are produced flagged and editable before copying.
 
 ### Getting the result out
 
@@ -65,13 +59,9 @@ copying.
 
 #### Saving through the API
 
-A save through the REST API is **immediate and public**. There is no review
-page between the click and the edit, so the extension puts one there: a confirm
-panel lists every value that will be written, says who the edit will be
-credited to, and waits. Nothing is sent until **Create item** is pressed.
+Once the desired fields have been reviewed and edited appropriately, clicking **Create in Wikidata** will open a diff panel listing every value that will be written or changed, highlighted in green, along with the account Wikidata will credit. Nothing is sent until **Create item** is pressed.
 
-This works signed in or signed out. Signed out, the panel says the edit will
-carry a temporary account rather than a name.
+This works signed in or signed out. Signed out, the panel says the edit will carry a temporary account rather than a name.
 
 What a save writes:
 
@@ -82,19 +72,10 @@ What a save writes:
 | `P31` | `Q5`, human |
 | Edit summary | `Created from LCNAF <id> with LCNAF2Wiki` |
 
-Dates and occupations stay in the description and are **not** written as
-statements. A date needs a precision judgment the record does not carry, and an
-occupation needs a term-to-item mapping that an authority record does not
-supply. Writing either from a guess would put a wrong claim in a public
-database, which costs more to undo than to never make.
-
 
 #### Adding to an item that exists
 
-When the duplicate check finds an item, the tool reads it and compares. If the
-record holds nothing the item lacks, the button reads **Entry exists** and only
-opens it. If the record holds more, the button reads **Add to Q…** and offers
-the difference:
+When the duplicate check finds an item, the tool reads it and compares. If the record holds nothing the item lacks, the button reads **Entry exists** and only opens it. If the record holds more, the button reads **Add to Q…** and offers the difference:
 
 ```
 Add to Q42?
@@ -110,34 +91,21 @@ Add to Q42?
 
 A line with a green `+` is written. A grey line is not, and says why.
 
-**The tool never removes anything.** A label, a description or a statement
-property the item already fills is left exactly as it is, even where the
-record disagrees, because the record is one source among several and the item
-can hold work the tool knows nothing about. Replacing a value is a judgment
-for a cataloguer on Wikidata, not for this tool.
-
-After a save the button reads the new Q-number and stays disabled, so a second
-press cannot make a duplicate. A failed save leaves the draft untouched, so
-nothing typed is lost; an expired sign-in says so and asks for another.
-
-All three read the fields at click time, so edits made in the popup are carried
-through.
+**The tool never removes anything.** A label, a description or a statement property the item already fills is left exactly as it is, even where the record disagrees. Careful human review is strongly advised when using this feature.
 
 ### Settings
 
-Settings live on their own page: **Extensions → LCNAF2Wiki → Details →
-Extension options**, or the **Settings** link in the popup footer. Changes save
-immediately and take effect on the next click.
+Settings can be adjusted on: **Extensions → LCNAF2Wiki → Details → Extension options**, or the **Settings** link in the popup footer. Changes save immediately and take effect on the next click.
 
 | Setting | Default | What it does |
 |---|---|---|
+| **Text filters** | (none) | Under Advanced. Replace text as it is read from the record. Refer to [Text filters](#text-filters). |
 | **A different OAuth client** | (empty) | Under Advanced. Only for signing in through an institutional client. Refer to [Signing in](#signing-in). |
 | **How an item is saved** | Through the API | Whether **Create in Wikidata** saves through the REST API under your account, or opens a prefilled `Special:NewItem`. |
 | **Check for duplicates first** | On | Before unlocking **Create in Wikidata**, search Wikidata for an item that already carries this LCNAF id in `P244`, then for a person with the same name and years. |
 | **Toolbar icon click** | Open the full menu | Whether clicking the toolbar icon opens this popup, or goes straight to a prefilled `Special:NewItem`. |
 
-Changing the client id signs you out, because a token belongs to the client
-that issued it.
+Changing the client id signs you out, because a token belongs to the client that issued it.
 
 The check runs in order, stopping at the first thing it finds:
 
@@ -145,21 +113,10 @@ The check runs in order, stopping at the first thing it finds:
 |---|---|---|
 | 1 | `P244` for the LCNAF id | Proof |
 | 2 | `P214` for the VIAF number from `024`, if the record carries one | Proof |
-| 3 | Label and both years, for an item with no `P244` | Evidence |
-
-An exact identifier match is proof of a duplicate; a name match is not, since
-two people can share a name.
-
-Both years must be present, and each may differ by one, because catalogues
-disagree about a birth or death year by a year often enough to matter. A
-record with no death year, such as a living person, skips this check, since a
-name and one year is too weak to show anyone.
-
-The check fails open. If Wikidata is unreachable, rate-limits the request, or
-does not answer in time, the button returns to normal. A failed lookup is not
-evidence that no item exists, and must never block a legitimate record.
+| 3 | Label and both years, for an item with no `P244` or `P214` | Evidence |
 
 
+When a match is found, **Create in Wikidata** turns yellow and reads **Entry exists** or **Add to Entry**, naming the matching item in its tooltip. When the `P244` search finds nothing, the Wikidata query service looks for a person with the same label and both years, and with no `P244` of their own. If one is found, the button turns amber with a dashed border and reads **Possible match ↗**, and the cataloguer opens the item and judges it.
 
 
 ## What it shows
@@ -173,15 +130,24 @@ Below the derived fields, each MARC tag is one colour-coded chip:
 | **Yellow** `i` | Present, but human review suggested.|
 | **Red** `!` | The record shape is a problem for building an item. |
 
-The `024` field is read but has no chip: it holds no name text, and what it
-contributes is the duplicate check rather than a field of the draft.
+The `024` field is read but has no chip: it holds no name text, and what it contributes is the duplicate check rather than a field of the draft. A chip shows its count when a tag repeats (`400 ×3`). Click on a chip to preview its detail; click to pin it open so the text can be read and copied.
 
-A chip shows its count when a tag repeats (`400 ×3`). Hover or focus a chip to
-preview its detail; click to pin it open so the text can be read and copied.
+### Text filters
 
-Detail shows the messages for that tag plus each field in conventional MARC form
-(`100 1# $a Sween, Joyce A. $q (Joyce Ann), $d 1937-`). Raw MARCXML sits
-collapsed at the bottom.
+LC sends text that a browser cannot always show. A filter can do that replacement once, under **Advanced** in the settings.
+
+Each row is a pair. **replace:** is the text to find, **with:** is what to put in its place; leaving **with:** empty removes the text. The plus button adds a row and the × removes one, and a change saves as it is typed.
+
+```
+replace: [ MacManus        ]   with: [ McManus         ]  ×
+replace: [ ﷽              ]   with: [                 ]  ×
+
+                                           + Add a filter
+```
+
+Filters run in order against the name, the variant names and the occupations, before the fields are built, so one filter covers the label and every alias that holds the same text.
+
+Filters do not touch the MARC chips, which show the record as it arrived. A value the tool changed and the chip that shows the original can be compared side by side.
 
 ## Layout
 
@@ -197,6 +163,7 @@ core/                 no chrome.* APIs; runs under Node in tests
   quickstatements.js  QuickStatements v1 output
   newitem.js          prefilled Special:NewItem url
   lcClient.js         single-record fetch against id.loc.gov
+  filters.js          literal find-and-replace over the record text
   identifiers.js      024 external identifiers: VIAF and Wikidata
   diff.js             what a record adds to an item that exists
   wikidata.js         P244 and P214 duplicate check (fails open)

@@ -159,7 +159,7 @@ footer a {
   color: #fff;
 }
 
-/* A setting whose control sits under its text, not beside it. */
+/* A setting with its control below its text. */
 .setting-block {
   display: block;
 }
@@ -183,7 +183,7 @@ footer a {
   outline-offset: 1px;
 }
 
-/* The callback address. It is copied, so it is monospaced and selectable. */
+/* The callback address. It is monospaced and selectable, so that the user can copy it. */
 .redirect {
   display: inline-block;
   margin-top: 2px;
@@ -216,8 +216,7 @@ footer a {
   }
 }
 
-/* The advanced section. Collapsed, because nearly nobody needs it: the
-   extension carries its own registered client. */
+/* The advanced section. It is closed by default. */
 .advanced {
   margin-top: 6px;
   border-top: 1px solid var(--line, #e2e4e9);
@@ -245,8 +244,8 @@ footer a {
   margin: 8px 0;
 }
 
-/* One filter: two fields and a remove button on one line. The fields share
-   the width, so a long replacement is as readable as a short one. */
+/* One filter: two fields and a remove button on one line.
+   The two fields have equal width. */
 .filter-row {
   display: flex;
   gap: 8px;
@@ -267,13 +266,13 @@ footer a {
   color: var(--muted, #61656e);
 }
 
-/* The filter fields hold text that the record sent, which can be in any
-   script. A monospace face makes a damaged character visible. */
+/* The filter fields contain record text in any script.
+   A monospace font makes a damaged character visible. */
 .filter-row .text-input {
   margin: 0;
 }
 
-/* The remove button lines up with the fields, not with their labels. */
+/* Align the remove button with the fields, not with their labels. */
 .filter-remove {
   flex: none;
   width: 28px;

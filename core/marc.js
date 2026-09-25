@@ -1,6 +1,6 @@
 /**
- * MARCXML access primitives. The DOM access uses namespaces.
- * The accessors also take a record from marcLite.js, which has no `doc`.
+ * Read MARCXML records. The DOM access uses namespaces.
+ * These functions also accept a record from marcLite.js, which has no `doc`.
  */
 
 export const MARCXML_NS = 'http://www.loc.gov/MARC21/slim';
@@ -19,19 +19,19 @@ export function parseMarcXml(xml, id) {
   // Use getElementsByTagName, which the test DOM also supports.
   const err = doc.getElementsByTagName('parsererror')[0];
   if (err) {
-    throw new Error(`Malformed MARCXML for ${id}: ${err.textContent.trim().slice(0, 200)}`);
+    throw new Error(`The MARCXML for ${id} is not well-formed: ${err.textContent.trim().slice(0, 200)}`);
   }
 
   // LC sends an HTML error page for some identifiers, not a 404 status.
   if (doc.getElementsByTagNameNS(MARCXML_NS, 'record').length === 0) {
-    throw new Error(`Response for ${id} is not a MARCXML record.`);
+    throw new Error(`The response for ${id} is not a MARCXML record.`);
   }
 
   return { id, doc, source: xml };
 }
 
 /**
- * All datafields that have the specified MARC tag, in document order.
+ * Get all datafields with the specified MARC tag, in document order.
  * @param {{doc: XMLDocument}} rec
  * @param {string} tag e.g. "100", "400", "374"
  * @returns {Element[]}
@@ -45,8 +45,8 @@ export function datafields(rec, tag) {
 }
 
 /**
- * All subfield values with the specified code, in order. A datafield can
- * repeat a code: the 374 field usually has more than one $a occupation.
+ * Get all subfield values with the specified code, in sequence.
+ * A code can repeat. The 374 field usually has more than one $a.
  * @param {Element} field
  * @param {string} code e.g. "a", "c", "d", "q"
  * @returns {string[]}
@@ -68,8 +68,8 @@ export function subfields(field, code) {
 }
 
 /**
- * The first subfield value that has the specified code. Undefined if there is
- * no such subfield.
+ * Get the first subfield value with the specified code.
+ * Return undefined if there is no such subfield.
  * @param {Element} field
  * @param {string} code
  * @returns {string | undefined}
@@ -79,7 +79,7 @@ export function subfield(field, code) {
 }
 
 /**
- * All subfields as {code, value} pairs, in document order.
+ * Get all subfields as {code, value} pairs, in document order.
  * @param {Element} field
  * @returns {{code: string, value: string}[]}
  */
@@ -96,7 +96,7 @@ export function allSubfields(field) {
 }
 
 /**
- * The indicator values for a datafield. A blank indicator shows as "#".
+ * Get the indicator values for a datafield. A blank indicator shows as "#".
  * @param {Element} field
  * @returns {{ind1: string, ind2: string}}
  */
@@ -114,8 +114,8 @@ export function indicators(field) {
 }
 
 /**
- * The value of a control field (001, 008, and others). Undefined if the field
- * is absent.
+ * Get the value of a control field (001, 008, and others).
+ * Return undefined if the field is not present.
  * @param {{doc: XMLDocument}} rec
  * @param {string} tag
  * @returns {string | undefined}

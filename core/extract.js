@@ -1,12 +1,12 @@
 /**
- * Passive extraction of the 100, 400 and 374 fields, with no transformation.
- * It shows the shape of the record. mapper.js does the mapping.
+ * Extract the 100, 400, 374 and 500 fields with no changes, to show the record.
+ * mapper.js does the mapping.
  */
 
 import { datafields, subfields, subfield, allSubfields, indicators, controlfield } from './marc.js';
-import { describeRelated, extractRelated, relatedNote } from './related.js';
+import { extractRelated, relatedAsText } from './related.js';
 
-/** The MARC tags that this prototype reads, with labels for the UI. */
+/** The MARC tags that this tool reads, with labels for the UI. */
 export const TAGS = [
   { tag: '100', name: 'Personal name (authorized heading)' },
   { tag: '400', name: 'See-from tracing (variant name)' },
@@ -15,20 +15,22 @@ export const TAGS = [
 ];
 
 /**
- * Extract the 100, 400 and 374 fields from a parsed record.
- *
+ * Extract the 100, 400, 374 and 500 fields from a parsed record.
  * @param {{id: string, doc: XMLDocument, source: string}} rec
  * @returns {{
  *   id: string,
  *   heading: string | undefined,
- *   groups: {tag: string, name: string, fields: object[], status: Status, messages: string[]}[],
+ *   groups: {tag: string, name: string, fields: object[], status: Status, messages: string[], copyText?: string}[],
  *   source: string
  * }}
  */
 export function extractFields(rec) {
   const groups = TAGS.map(({ tag, name }) => {
     const fields = datafields(rec, tag).map((el, i) => describeField(el, tag, i));
-    return { tag, name, fields, ...assess(tag, fields, rec) };
+    const group = { tag, name, fields, ...assess(tag, fields, rec) };
+    // The 500 card shows the related names as a field that the user can copy.
+    if (tag === '500' && fields.length) group.copyText = relatedAsText(extractRelated(rec));
+    return group;
   });
 
   return {
@@ -40,9 +42,7 @@ export function extractFields(rec) {
 }
 
 /**
- * The status of one tag group, which sets its colour: present (green), absent
- * (grey), notable (yellow), attention (red). Refer to the README.
- *
+ * The status of one tag group sets its color. Refer to the README.
  * @typedef {'present' | 'absent' | 'notable' | 'attention'} Status
  */
 
@@ -60,26 +60,26 @@ function assess(tag, fields, rec) {
 
   if (tag === '100') {
     if (fields.length === 0) {
-      // Without a personal-name heading you cannot build a label.
+      // You cannot make a label without a personal name heading.
       attention = true;
       if (datafields(rec, '110').length) {
-        messages.push('Corporate name (110), not a personal name.');
+        messages.push('Corporate name (110). It is not a personal name.');
       } else if (datafields(rec, '111').length) {
-        messages.push('Meeting name (111), not a personal name.');
+        messages.push('Meeting name (111). It is not a personal name.');
       } else {
-        messages.push('No authorized personal-name heading found.');
+        messages.push('The record has no authorized personal name heading.');
       }
     } else {
       if (fields.length > 1) {
         attention = true;
-        messages.push(`${fields.length} 100 fields.`);
+        messages.push(`The record has ${fields.length} 100 fields.`);
       }
       for (const f of fields) {
         if (f.titleWords) {
-          // The position of a title is a decision for a person.
-          // Examples: "Sir John Smith", but "Irwin B. Rothschild III".
+          // A person must decide the position of a title.
+          // Examples: "Sir John Smith" and "Irwin B. Rothschild III".
           attention = true;
-          messages.push(`$c "${f.titleWords}": check placement in direct order.`);
+          messages.push(`$c "${f.titleWords}": check the position in direct order.`);
         }
         if (f.fullerForm) {
           notable = true;
@@ -89,8 +89,8 @@ function assess(tag, fields, rec) {
   }
 
   if (tag === '374') {
-    // Repeated $a or separate fields is a serialisation detail. The chip
-    // becomes yellow and the MARC lines show the terms, so no message is needed.
+    // More than one term makes the chip yellow.
+    // The MARC lines show the terms, so do not add a message.
     const terms = fields.flatMap((f) => f.values);
     if (terms.length > 1) {
       notable = true;
@@ -106,11 +106,9 @@ function assess(tag, fields, rec) {
   }
 
   if (tag === '500' && fields.length) {
-    // Always yellow. A related identity is never acted on by the tool, and
-    // always worth a cataloguer's eye: it can be a pseudonym of this person
-    // or a different person entirely.
+    // Always yellow. The tool does not use a related identity.
+    // It can be a pseudonym or a different person, so a person must examine it.
     notable = true;
-    messages.push(...describeRelated(extractRelated(rec), relatedNote(rec)));
   }
 
   if (fields.length === 0 && !attention) {
@@ -134,7 +132,7 @@ const ABSENT_NOTE = {
 };
 
 /**
- * One datafield, made flat for display.
+ * Make one datafield flat for display.
  * @param {Element} el
  * @param {string} tag
  * @param {number} index the position in the fields that have this tag
@@ -145,9 +143,9 @@ function describeField(el, tag, index) {
     index,
     ...indicators(el),
     subfields: allSubfields(el),
-    // The $a subfield repeats in one 374 field, so this is always an array.
+    // The $a subfield can repeat in one 374 field, so this is always an array.
     values: subfields(el, 'a'),
-    // Accessors the UI highlights. Undefined when the subfield is absent.
+    // The UI highlights these. Each is undefined if the subfield is not present.
     dates: subfield(el, 'd'),
     titleWords: subfield(el, 'c'),
     fullerForm: subfield(el, 'q'),
@@ -158,7 +156,7 @@ function describeField(el, tag, index) {
 }
 
 /**
- * Show a datafield in the usual single-line MARC form that cataloguers read.
+ * Show a datafield in the single-line MARC form.
  * @param {Element} el
  * @param {string} tag
  * @returns {string}
@@ -181,8 +179,8 @@ function headingOf(rec) {
 }
 
 /**
- * Normalize an LCNAF identifier. LC prints padding that is not part of the
- * identifier, so "n  83053245" becomes "n83053245".
+ * Normalize an LCNAF identifier. Remove the space characters from LC padding.
+ * Example: "n  83053245" becomes "n83053245".
  * @param {string} raw
  * @returns {string}
  */

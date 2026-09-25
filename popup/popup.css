@@ -6,8 +6,8 @@
   --accent: #4e2a84; /* Northwestern purple */
   --code: #2c3038;
 
-  /* The status colours. Each status has a fill, a border and a foreground
-     colour. Thus the chips stay legible without the colour. */
+  /* The status colors. Each status has a fill, a border, and a foreground color.
+     Thus the chips are legible without the color. */
   --ok-bg: #e7f5ec;
   --ok-line: #7fc39b;
   --ok-fg: #1d6b40;
@@ -195,12 +195,12 @@ main {
   line-height: 1.4;
   resize: none;
 
-  /* A minimum value for the condition in which the JavaScript measurement is
-     unavailable. The field must not become a strip that you cannot read. */
+  /* The minimum height if the JavaScript measurement is not available.
+     The field must stay legible. */
   min-height: 2.2em;
 
-  /* The script makes the field large enough for its contents. Thus a
-     scrollbar uses space and has no function. */
+  /* The script makes the field large enough for its contents.
+     Thus a scrollbar is not necessary. */
   overflow: hidden;
 }
 
@@ -297,11 +297,16 @@ main {
     box-shadow 0.12s ease;
 }
 
-.chip:hover,
-.chip:focus-visible,
+.chip:hover {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+/* The selected chip. A ring in the status color and a deep shadow. */
 .chip.is-open {
-  transform: translateY(-1px);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.16);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 2px currentColor,
+    0 4px 10px rgb(0 0 0 / 0.3);
 }
 
 .chip:focus-visible {
@@ -477,8 +482,6 @@ footer a:hover {
   .chip {
     transition: none;
   }
-  .chip:hover,
-  .chip:focus-visible,
   .chip.is-open {
     transform: none;
   }
@@ -486,8 +489,8 @@ footer a:hover {
 
 /* ---- duplicate check ---- */
 
-/* The create button in its "entry exists" condition. A click opens the
-   Wikidata item that holds this LCNAF identifier. */
+/* The create button in the "entry exists" state.
+   A click opens the Wikidata item that has this LCNAF identifier. */
 .copy-exists {
   border-color: var(--info-line);
   background: var(--info-bg);
@@ -499,8 +502,8 @@ footer a:hover {
   color: var(--info-fg);
 }
 
-/* A name and date match. The same amber as "entry exists", because both stop
-   the cataloguer, but the dashed border says the match is not proof. */
+/* A name and date match. It uses the amber of "entry exists".
+   The dashed border shows that the match is not proof. */
 .copy-possible {
   border-style: dashed;
   border-color: var(--info-line);
@@ -535,10 +538,9 @@ footer a:hover {
   outline-offset: 2px;
 }
 
-/* ---- account, gate and confirm ---- */
+/* ---- account and confirm step ---- */
 
-/* The signed-in account sits in the header, so the cataloguer always knows
-   which name an edit will carry. */
+/* The signed-in account in the header. */
 .account {
   display: flex;
   align-items: center;
@@ -560,8 +562,7 @@ footer a:hover {
   background: var(--ok-line);
 }
 
-/* The confirm step. A saved item cannot be taken back with one click, so
-   the write is shown in full before it happens. */
+/* The confirm step. It shows all the data before the save. */
 .confirm {
   margin-top: 10px;
   padding: 10px;
@@ -605,7 +606,7 @@ footer a:hover {
   gap: 8px;
 }
 
-/* The result of a save. Green, because the item now exists. */
+/* The result of a save. */
 .created {
   margin-top: 10px;
   padding: 10px;
@@ -624,7 +625,7 @@ footer a:hover {
   color: inherit;
 }
 
-/* A failed save. The draft stays on screen, so nothing typed is lost. */
+/* A failed save. */
 .save-error {
   margin-top: 10px;
   padding: 10px;
@@ -638,9 +639,8 @@ footer a:hover {
 
 /* ---- the diff ---- */
 
-/* An addition reads the way a diff does: a plus, a green ground, and the
-   value beside its field name. Nothing here is ever a removal, because the
-   tool only adds. */
+/* The diff. An addition has a plus, a green background, and the value
+   next to its field name. */
 .diff {
   margin: 0 0 10px;
   border: 1px solid var(--line);
@@ -662,8 +662,7 @@ footer a:hover {
   border-bottom: 0;
 }
 
-/* Green, as a diff marks an addition. The plus carries the same meaning,
-   so the line stays readable without the colour. */
+/* An addition is green. The plus has the same meaning without the color. */
 .diff-add {
   background: var(--ok-bg);
   color: var(--ok-fg);
@@ -690,16 +689,15 @@ footer a:hover {
   overflow-wrap: anywhere;
 }
 
-/* Why a line is not being added. It sits under the value, so the column
-   stays aligned. */
+/* The reason that the tool does not add a line.
+   It is below the value, so the column stays aligned. */
 .diff-note {
   grid-column: 3;
   font-style: italic;
   opacity: 0.8;
 }
 
-/* The button that adds to an item instead of creating one. Green, because
-   it only ever adds. */
+/* The button that adds to an item that exists. */
 .copy-add {
   border-color: var(--ok-line);
   background: var(--ok-bg);

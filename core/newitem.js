@@ -1,14 +1,12 @@
 /**
- * Prefilled Special:NewItem links. The server renders the query parameters
- * into the form. Nothing is saved until the cataloguer presses Create.
+ * Make prefilled Special:NewItem links. The server puts the query parameters into the form.
+ * Wikidata saves nothing until the user presses Create.
  */
 
 const NEW_ITEM_URL = 'https://www.wikidata.org/wiki/Special:NewItem';
 
 /**
- * Build a prefilled Special:NewItem URL. Empty fields are omitted, so the
- * form shows its own placeholder text.
- *
+ * Make a prefilled Special:NewItem URL. Omit empty fields.
  * @param {import('./mapper.js').WikidataDraft} draft
  * @returns {string}
  */

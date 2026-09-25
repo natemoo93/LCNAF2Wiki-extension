@@ -1,19 +1,12 @@
 /**
- * Text filters: plain find-and-replace over the values read from a record.
- * Pure: text in, text out, no I/O.
- *
- * LC sends text that a browser cannot always show, such as a non-Latin script
- * that arrives damaged, or a character the cataloguer's workflow replaces by
- * hand every time. A filter does that replacement once, in the settings.
- *
- * A filter is a literal string, not a pattern. A cataloguer pasting a broken
- * character must not have it read as a regular expression.
+ * Find and replace text in the values from a record.
+ * A filter is a literal string, not a regular expression.
  */
 
-/** The most filters one installation can hold. The store has a size limit. */
+/** The maximum number of filters. The storage has a size limit. */
 export const MAX_FILTERS = 50;
 
-/** The longest either side of a filter can be. */
+/** The maximum length of each side of a filter. */
 export const MAX_FILTER_LENGTH = 200;
 
 /**
@@ -21,10 +14,8 @@ export const MAX_FILTER_LENGTH = 200;
  */
 
 /**
- * Apply every filter to one value, in order.
- * A filter with an empty `replace` is skipped, because replacing nothing
- * would insert the replacement between every character.
- *
+ * Apply each filter to one value, in sequence.
+ * Skip a filter with an empty `replace`, because it matches between all characters.
  * @param {string} value
  * @param {TextFilter[]} filters
  * @returns {string}
@@ -46,10 +37,8 @@ export function applyFilters(value, filters) {
 }
 
 /**
- * Keep only the filters that can be used, and cut them to size.
- * A damaged store must not stop the popup, so anything unreadable is
- * dropped rather than thrown.
- *
+ * Keep only the usable filters, and cut them to the maximum length.
+ * Remove data that is not usable. Do not throw an error.
  * @param {unknown} filters
  * @returns {TextFilter[]}
  */
@@ -63,7 +52,7 @@ export function cleanFilters(filters) {
     const from = typeof filter.replace === 'string' ? filter.replace : '';
     const to = typeof filter.with === 'string' ? filter.with : '';
 
-    // An empty left side matches everywhere, so it is not a filter.
+    // An empty left side matches all positions, so it is not a filter.
     if (!from) continue;
 
     out.push({
@@ -79,7 +68,6 @@ export function cleanFilters(filters) {
 
 /**
  * Show a filter as one line, for a note or a log.
- *
  * @param {TextFilter} filter
  * @returns {string}
  */

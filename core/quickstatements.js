@@ -1,15 +1,13 @@
 /**
- * QuickStatements v1 output. Tab-separated commands, where `LAST` is the item
- * that the preceding CREATE made. https://quickstatements.toolforge.org/#/help
+ * Make QuickStatements v1 output. Tabs separate the parts of each command.
+ * `LAST` is the item from the CREATE command. https://quickstatements.toolforge.org/#/help
  */
 
 /** The Wikidata property for the Library of Congress authority ID. */
 const P_LC_AUTHORITY = 'P244';
 
 /**
- * Build a QuickStatements v1 batch. The P244 statement is always emitted, so
- * a later reconciliation is an exact lookup and not a name match.
- *
+ * Make a QuickStatements v1 batch. Always include the P244 statement.
  * @param {import('./mapper.js').WikidataDraft} draft
  * @returns {string}
  */
@@ -30,7 +28,7 @@ export function toQuickStatements(draft) {
 }
 
 /**
- * A QuickStatements string literal, with quotes and backslashes escaped.
+ * Make a QuickStatements string literal. Escape quotes and backslashes.
  * @param {string} value
  * @returns {string}
  */

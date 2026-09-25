@@ -1,13 +1,6 @@
 /**
- * What a draft would add to an item that already exists. Pure: a draft and
- * an item in, a list of additions out.
- *
- * The tool only ever adds. A value already on the item is left as it is,
- * even when the record disagrees, because the record is one source among
- * several and the item can hold work this tool knows nothing about. A
- * cataloguer who wants to replace a value does it on Wikidata.
- *
- * Thus a field the item already fills is 'same' or 'kept', never 'changed'.
+ * Find what a draft adds to an item that exists. Only add values.
+ * A field that the item has is 'same' or 'kept', never 'changed'.
  */
 
 /**
@@ -31,18 +24,17 @@
  * }} ItemDiff
  */
 
-/** The statements this tool writes, and what to call them. */
+/** The statements that this tool writes, and their display names. */
 const STATEMENT_NAMES = {
   P244: 'LCNAF ID (P244)',
   P31: 'Instance of (P31)',
 };
 
 /**
- * Compare a draft against an item that exists.
- *
+ * Compare a draft with an item that exists.
  * @param {import('./mapper.js').WikidataDraft} draft
  * @param {object} item the item as the REST API returns it
- * @param {Record<string, object[]>} statements the statements the draft would write
+ * @param {Record<string, object[]>} statements the statements from the draft
  * @returns {ItemDiff}
  */
 export function diffAgainstItem(draft, item, statements = {}) {
@@ -54,8 +46,7 @@ export function diffAgainstItem(draft, item, statements = {}) {
   const aliases = {};
   const newStatements = {};
 
-  // A label or a description is one value per language, so it is added only
-  // when the item has none. An item that has one keeps it.
+  // Add a label or a description only if the item has none in this language.
   const existingLabel = item?.labels?.[lang] ?? '';
   if (draft.label && !existingLabel) {
     labels[lang] = draft.label;
@@ -89,14 +80,12 @@ export function diffAgainstItem(draft, item, statements = {}) {
     });
   }
 
-  // Aliases are a list, so each one is judged on its own. An alias the item
-  // already holds is skipped; the rest are added beside what is there.
+  // Examine each alias. Skip an alias that the item has, and add the others.
   const existingAliases = item?.aliases?.[lang] ?? [];
-  // Whether there is a list to append to. An absent language has none.
+  // Record if an alias list exists for this language.
   const hadAliases = existingAliases.length > 0;
   const known = new Set(existingAliases.map(fold));
-  // The label is not an alias of itself, and Wikidata refuses one that
-  // matches the label.
+  // Wikidata refuses an alias that is the same as the label.
   if (existingLabel) known.add(fold(existingLabel));
 
   const freshAliases = [];
@@ -111,14 +100,11 @@ export function diffAgainstItem(draft, item, statements = {}) {
   }
 
   if (freshAliases.length) {
-    // Only the new ones. Each is appended on its own, so the existing list
-    // is never rewritten.
+    // Keep only the new aliases. Do not write the existing list again.
     aliases[lang] = freshAliases;
   }
 
-  // A statement is added only when the property is absent. A property that
-  // is present can hold a value this tool did not write, and replacing it
-  // would remove somebody's work.
+  // Add a statement only if the item does not have the property.
   for (const [property, list] of Object.entries(statements)) {
     const name = STATEMENT_NAMES[property] ?? property;
     const held = item?.statements?.[property] ?? [];
@@ -155,14 +141,8 @@ export function diffAgainstItem(draft, item, statements = {}) {
 }
 
 /**
- * The JSON Patch that adds everything in a diff to an item.
- *
- * Every operation is an `add`. A label or a description is added only where
- * the item has none, so `add` writes into an empty place and replaces
- * nothing. An alias appends with the `/-` path, which puts the value at the
- * end of the list and leaves the rest untouched. Thus the patch can only
- * grow the item, whatever else it holds.
- *
+ * Make the JSON Patch that adds the diff to an item.
+ * Each operation is an `add` into an empty place or onto the end of a list.
  * @param {ItemDiff} diff
  * @param {string} lang
  * @param {string} lcnafId
@@ -181,10 +161,8 @@ export function buildAddPatch(diff, lang, lcnafId) {
     patch.push({ op: 'add', path: `/descriptions/${lang}`, value: diff.descriptions[lang] });
   }
 
-  // Aliases. A language the item has no aliases in has no list to append
-  // to, so the list is created in one operation. Where a list exists, each
-  // alias appends with the `/-` path, which leaves the existing ones alone.
-  // Rewriting the whole list would drop an alias added since the read.
+  // If no alias list exists, make the list in one operation.
+  // If a list exists, add each alias to the end with the `/-` path.
   if (diff.freshAliases.length) {
     if (diff.hadAliases) {
       for (const alias of diff.freshAliases) {
@@ -195,8 +173,7 @@ export function buildAddPatch(diff, lang, lcnafId) {
     }
   }
 
-  // A statement list is added only for a property the item does not have,
-  // so this writes into an empty place.
+  // The item does not have these properties, so each `add` writes into an empty place.
   for (const [property, list] of Object.entries(diff.statements)) {
     patch.push({ op: 'add', path: `/statements/${property}`, value: list });
   }
@@ -208,8 +185,7 @@ export function buildAddPatch(diff, lang, lcnafId) {
 }
 
 /**
- * A short count of what would be added, for a button or a heading.
- *
+ * Make a short summary of the additions for a button or a heading.
  * @param {ItemDiff} diff
  * @returns {string}
  */
@@ -227,19 +203,18 @@ export function summarizeAdditions(diff) {
 }
 
 /**
- * The value of a statement as text, for showing and comparing.
- *
+ * Get the value of a statement as text, to show and compare.
  * @param {object} statement
  * @returns {string}
  */
 function readStatementValue(statement) {
   const content = statement?.value?.content;
   if (content == null) return '';
-  // A time value is an object; everything this tool writes is a string.
+  // A time value is an object. All values from this tool are strings.
   return typeof content === 'string' ? content : (content.time ?? JSON.stringify(content));
 }
 
-/** Compare two strings the way a cataloguer would: case and spacing aside. */
+/** Normalize text for comparison. Ignore case and extra space characters. */
 function fold(value) {
   return String(value ?? '')
     .trim()
@@ -247,7 +222,7 @@ function fold(value) {
     .replace(/\s+/g, ' ');
 }
 
-/** True when two pieces of text say the same thing. */
+/** Return true if two texts are the same after normalization. */
 function sameText(a, b) {
   return fold(a) === fold(b);
 }

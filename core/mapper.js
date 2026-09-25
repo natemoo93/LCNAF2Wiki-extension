@@ -1,6 +1,6 @@
 /**
- * MARC record to Wikidata draft. Pure: a record in, a draft out, no I/O.
- * The draft carries the warnings that say which fields to examine.
+ * Make a Wikidata draft from a MARC record.
+ * The draft has warnings that identify the fields to examine.
  */
 
 import { datafields, subfields, subfield, indicators } from './marc.js';
@@ -10,7 +10,7 @@ import { extractDates, formatDateParens, PRIVACY_BIRTH_YEAR } from './dates.js';
 import { viafId, wikidataId } from './identifiers.js';
 import { applyFilters } from './filters.js';
 
-/** The default language. One constant, so reading 040 $b later is one line. */
+/** The default language. */
 export const DEFAULT_LANG = 'en';
 
 /**
@@ -39,8 +39,8 @@ export const DEFAULT_LANG = 'en';
  */
 export function mapRecord(rec, opts = {}) {
   const warnings = [];
-  // The filters run on the text read from the record, before it is
-  // inverted or cased, so one filter covers the label and the aliases.
+  // Apply the filters to the record text before inversion.
+  // Thus one filter changes the label and the aliases.
   const filters = opts.textFilters ?? [];
 
   const label = buildLabel(rec, warnings, filters);
@@ -50,7 +50,7 @@ export function mapRecord(rec, opts = {}) {
 
   return {
     lcnafId: rec.id,
-    // From 024. Either can be absent, and most records carry neither.
+    // These come from 024. Most records do not have them.
     viafId: viafId(rec),
     wikidataId: wikidataId(rec),
     lang: DEFAULT_LANG,
@@ -85,13 +85,13 @@ function buildLabel(rec, warnings, filters = []) {
     warnings.push({
       code: 'no-personal-name',
       field: '100',
-      detail: kind ? `Record is a ${kind}, not a personal name.` : 'No 100 field.',
+      detail: kind ? `The record is a ${kind}. It is not a personal name.` : 'The record has no 100 field.',
     });
     return '';
   }
 
   if (fields.length > 1) {
-    warnings.push({ code: 'multiple-100', field: '100', detail: `${fields.length} 100 fields.` });
+    warnings.push({ code: 'multiple-100', field: '100', detail: `The record has ${fields.length} 100 fields.` });
   }
 
   const f = fields[0];
@@ -121,7 +121,7 @@ function buildAliases(rec, label, warnings, filters = []) {
   let uncertain = 0;
 
   for (const f of datafields(rec, '400')) {
-    // The $w subfield gives the relation, not name text. It is not used.
+    // Do not use $w. It gives the relation, not name text.
     const parsed = invertName(applyFilters(subfield(f, 'a'), filters), {
       ind1: rawInd1(f),
       titleWords: applyFilters(subfield(f, 'c'), filters),
@@ -131,7 +131,7 @@ function buildAliases(rec, label, warnings, filters = []) {
     if (!value) continue;
     if (parsed.confidence === 'low') uncertain++;
 
-    // An alias equal to the label adds no data.
+    // Skip an alias that is the same as the label.
     const key = value.toLowerCase();
     if (key === label.toLowerCase() || seen.has(key)) continue;
 
@@ -143,7 +143,7 @@ function buildAliases(rec, label, warnings, filters = []) {
     warnings.push({
       code: 'alias-uncertain',
       field: '400$a',
-      detail: `${uncertain} variant name(s) could not be inverted with confidence.`,
+      detail: `The tool cannot invert ${uncertain} variant name(s) with confidence.`,
     });
   }
 
@@ -151,9 +151,8 @@ function buildAliases(rec, label, warnings, filters = []) {
 }
 
 /**
- * Make the description: the occupations, then the years in parentheses.
- * Either part can be absent. Refer to the README for the privacy rule.
- *
+ * Make the description from the occupations and the years in parentheses.
+ * Each part is optional. Refer to the README for the privacy rule.
  * @param {object} rec
  * @param {Warning[]} warnings
  * @returns {{description: string, descriptionSource: 'occupation' | 'dates' | 'occupation+dates' | 'none'}}
@@ -170,7 +169,7 @@ function buildDescription(rec, warnings, filters = []) {
       warnings.push({
         code: 'lcsh-syntax',
         field: '374$a',
-        detail: `Kept LCSH syntax in: ${awkward.map(normalizeOccupation).join(', ')}.`,
+        detail: `These terms keep LCSH syntax: ${awkward.map(normalizeOccupation).join(', ')}.`,
       });
     }
   }
@@ -192,20 +191,19 @@ function buildDescription(rec, warnings, filters = []) {
     warnings.push({
       code: 'no-description',
       detail:
-        `No occupation, and the person was born after ${PRIVACY_BIRTH_YEAR}. ` +
+        `The record has no occupation, and the person was born after ${PRIVACY_BIRTH_YEAR}. ` +
         'The tool does not show the birth year of a person who can be alive.',
     });
   } else {
-    warnings.push({ code: 'no-description', detail: 'No occupation and no dates.' });
+    warnings.push({ code: 'no-description', detail: 'The record has no occupation and no dates.' });
   }
 
   return { description: '', descriptionSource: 'none' };
 }
 
 /**
- * The first indicator as written in the record. indicators() gives "#" for a
- * blank, but invertName needs undefined.
- *
+ * Get the first indicator as the record has it.
+ * Change "#" to undefined for invertName.
  * @param {object} field
  * @returns {string | undefined}
  */
@@ -215,7 +213,7 @@ function rawInd1(field) {
 }
 
 /**
- * The aliases with vertical bars between them, as Wikidata expects.
+ * Join the aliases with vertical bars for Wikidata.
  * @param {WikidataDraft} draft
  * @returns {string}
  */

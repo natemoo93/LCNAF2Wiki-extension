@@ -1,11 +1,6 @@
 /**
- * The signed-in session: the browser half of OAuth.
- * core/oauth.js speaks the protocol; this module runs the flow in a browser
- * extension, keeps the tokens and gives the rest of the app one question to
- * ask, getAccessToken().
- *
- * Tokens live in chrome.storage.local, never in sync. A sync store copies
- * itself to every signed-in browser, and a credential must not travel.
+ * Manage the signed-in session in the browser. core/oauth.js holds the protocol.
+ * Keep tokens in chrome.storage.local only, because sync copies them to other browsers.
  */
 
 import {
@@ -19,27 +14,21 @@ import {
 } from './oauth.js';
 import { USER_AGENT } from './wikidata.js';
 
-/** Where the tokens and the account sit in chrome.storage.local. */
+/** Storage keys for the tokens and the account in chrome.storage.local. */
 const TOKEN_KEY = 'oauthTokens';
 const ACCOUNT_KEY = 'oauthAccount';
 
-/** Where a client is registered. Only the advanced setting shows this. */
+/** The page that registers a client. Only the advanced setting shows it. */
 export const REGISTER_URL =
   'https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth2';
 
 /**
- * The registered OAuth client of this extension.
- *
- * This is public, and it is meant to be. A public client holds no secret,
- * because anything shipped in an extension can be read out of it. PKCE is
- * what proves a request, not a secret. Every installation shares this id and
- * each user still signs in to their own account and gets their own token.
- *
- * TODO: replace with the Northwestern institutional client once registered.
+ * The OAuth client ID of this extension. The ID is public and has no secret.
+ * TODO: replace with the Northwestern institutional client when it is registered.
  */
 const DEFAULT_CLIENT_ID = '';
 
-/** An override, for a different client. Empty for nearly every user. */
+/** Storage key for a different client ID. Most users leave it empty. */
 const CLIENT_ID_KEY = 'oauthClientId';
 
 /**
@@ -48,17 +37,13 @@ const CLIENT_ID_KEY = 'oauthClientId';
  */
 
 /**
- * One refresh at a time. Two popups opening together would otherwise each
- * spend the refresh token, and the second would fail with invalid_grant.
+ * The refresh that is in progress. Two popups must not use the same refresh token.
  * @type {Promise<string> | null}
  */
 let refreshing = null;
 
 /**
- * Who is signed in, if anyone.
- * 'unconfigured' means this build carries no client id and none is stored,
- * which only happens in a source tree where the constant is still empty.
- *
+ * Get the session state. 'unconfigured' means that no client ID is available.
  * @returns {Promise<SessionState>}
  */
 export async function getSession() {
@@ -68,30 +53,28 @@ export async function getSession() {
   const account = await readLocal(ACCOUNT_KEY);
   const tokens = await readLocal(TOKEN_KEY);
 
-  // An account with no refresh token cannot outlive its access token.
+  // Without an access token, the account is not usable.
   if (!account?.username || !tokens?.accessToken) return { state: 'out' };
 
   return { state: 'in', account };
 }
 
 /**
- * Run the sign-in. Opens the Wikimedia approval page in a browser window the
- * extension does not control, so the password is never seen by this code.
- *
+ * Sign in through the Wikimedia approval page. This code does not see the password.
  * @returns {Promise<Account>}
  */
 export async function signIn() {
   const clientId = await getClientId();
   if (!clientId) {
     throw authError(
-      'This build carries no OAuth client id, so sign-in cannot run.',
+      'This version has no OAuth client ID. You cannot sign in.',
       'unconfigured',
     );
   }
 
   const redirectUri = getRedirectUri();
   const { verifier, challenge } = await createPkcePair();
-  // The state ties the answer to this request, against a forged callback.
+  // The state connects the answer to this request. It stops a forged callback.
   const state = crypto.randomUUID();
 
   const url = authorizeUrl({ clientId, redirectUri, challenge, state });
@@ -109,10 +92,8 @@ export async function signIn() {
 }
 
 /**
- * Forget the tokens and the account. The authorization still stands on
- * Wikimedia, so this is a sign-out on this computer, not a revocation.
- * The message says so, and the options page links to the grant list.
- *
+ * Remove the tokens and the account from this computer.
+ * The authorization on Wikimedia stays.
  * @returns {Promise<void>}
  */
 export async function signOut() {
@@ -120,22 +101,20 @@ export async function signOut() {
 }
 
 /**
- * A usable access token, refreshed if it is near expiry.
- * Throws with the code 'signed-out' when there is nothing to refresh, so a
- * caller can send the user to the sign-in button.
- *
+ * Get an access token. Refresh it if it is almost expired.
+ * Throw with the code 'signed-out' if no token is available.
  * @returns {Promise<string>}
  */
 export async function getAccessToken() {
   const tokens = await readLocal(TOKEN_KEY);
 
   if (!tokens?.accessToken) {
-    throw authError('Not signed in to Wikidata.', 'signed-out');
+    throw authError('You are not signed in to Wikidata.', 'signed-out');
   }
 
   if (!isExpired(tokens)) return tokens.accessToken;
 
-  // Expired. Join the refresh already running, or start one.
+  // The token is expired. Use the refresh in progress, or start a new one.
   refreshing ??= runRefresh(tokens).finally(() => {
     refreshing = null;
   });
@@ -144,9 +123,8 @@ export async function getAccessToken() {
 }
 
 /**
- * Spend the refresh token for a new access token. A refusal is final, so the
- * session is cleared and the user signs in again.
- *
+ * Get a new access token with the refresh token.
+ * If Wikimedia refuses, clear the session.
  * @param {import('./oauth.js').TokenSet} tokens
  * @returns {Promise<string>}
  */
@@ -155,43 +133,40 @@ async function runRefresh(tokens) {
 
   if (!tokens.refreshToken || !clientId) {
     await signOut();
-    throw authError('The sign-in has expired. Sign in again.', 'signed-out');
+    throw authError('Your sign-in is expired. Sign in again.', 'signed-out');
   }
 
   try {
     const next = await refreshTokens({ clientId, refreshToken: tokens.refreshToken });
-    // Wikimedia can return a new refresh token. Keeping the old one would
-    // sign the user out at the next refresh.
+    // Keep the new refresh token. The old token can be invalid now.
     await writeLocal(TOKEN_KEY, next);
     return next.accessToken;
   } catch (cause) {
-    // A spent or withdrawn grant cannot be retried.
+    // Do not try again with a used or withdrawn grant.
     if (cause.code === 'invalid-grant' || cause.code === 'unauthorized') {
       await signOut();
-      throw authError('The sign-in has expired. Sign in again.', 'signed-out');
+      throw authError('Your sign-in is expired. Sign in again.', 'signed-out');
     }
-    // A network failure leaves the tokens alone, so a later try can work.
+    // Keep the tokens after a network failure. A later try can succeed.
     throw cause;
   }
 }
 
-/* ---------- the client id ---------- */
+/* ---------- the client ID ---------- */
 
 /**
- * The registered OAuth client id, or an empty string.
+ * Get the OAuth client ID, or an empty string.
  * @returns {Promise<string>}
  */
 export async function getClientId() {
   const stored = await readLocal(CLIENT_ID_KEY);
   const override = typeof stored === 'string' ? stored.trim() : '';
-  // An override wins, so a different client needs no new build.
+  // A stored ID replaces the built-in ID.
   return override || DEFAULT_CLIENT_ID;
 }
 
 /**
- * The client id built into this copy of the extension, ignoring any
- * override. The settings page shows this, so the two are distinguishable.
- *
+ * Get the built-in client ID. Ignore a stored ID.
  * @returns {string}
  */
 export function getBuiltInClientId() {
@@ -199,9 +174,7 @@ export function getBuiltInClientId() {
 }
 
 /**
- * Store the client id. Changing it invalidates the session, because the
- * tokens belong to the client that issued them.
- *
+ * Store the client ID. A change signs the user out, because tokens belong to one client.
  * @param {string} value
  * @returns {Promise<void>}
  */
@@ -209,7 +182,7 @@ export async function setClientId(value) {
   const next = String(value ?? '').trim();
   const current = await getClientId();
 
-  // An empty value clears the override and returns to the built-in client.
+  // An empty value removes the stored ID and uses the built-in ID.
   if (next === current || (!next && current === DEFAULT_CLIENT_ID)) return;
 
   await writeLocal(CLIENT_ID_KEY, next);
@@ -219,28 +192,26 @@ export async function setClientId(value) {
 /* ---------- the browser ---------- */
 
 /**
- * The address Wikimedia sends the browser back to. It is derived from the
- * extension id, so it cannot be claimed by a website.
- *
+ * Get the return address for the sign-in.
+ * The browser makes it from the extension ID, so a website cannot use it.
  * @returns {string}
  */
 export function getRedirectUri() {
   const api = globalThis.chrome?.identity ?? globalThis.browser?.identity;
   if (api?.getRedirectURL) return api.getRedirectURL();
-  throw authError('This browser has no identity API, so sign-in cannot run.', 'no-identity');
+  throw authError('This browser has no identity API. You cannot sign in.', 'no-identity');
 }
 
 /**
- * Open the approval page and wait for the browser to come back.
- * Chrome takes a callback, Firefox returns a promise, so this covers both.
- *
+ * Open the approval page and wait for the redirect.
+ * Chrome uses a callback and Firefox uses a promise.
  * @param {string} url
  * @returns {Promise<string>} the redirect address
  */
 function launchWebAuthFlow(url) {
   const api = globalThis.chrome?.identity ?? globalThis.browser?.identity;
   if (!api?.launchWebAuthFlow) {
-    throw authError('This browser has no identity API, so sign-in cannot run.', 'no-identity');
+    throw authError('This browser has no identity API. You cannot sign in.', 'no-identity');
   }
 
   return new Promise((resolve, reject) => {
@@ -252,12 +223,12 @@ function launchWebAuthFlow(url) {
 
       const failure = globalThis.chrome?.runtime?.lastError;
       if (failure) {
-        // The user closing the window arrives here, not as an OAuth error.
+        // A closed window comes here, not as an OAuth error.
         reject(authError(signInFailure(failure.message), 'cancelled'));
         return;
       }
       if (!redirectUrl) {
-        reject(authError('The sign-in window closed before it finished.', 'cancelled'));
+        reject(authError('The sign-in window closed before the sign-in was complete.', 'cancelled'));
         return;
       }
       resolve(redirectUrl);
@@ -277,16 +248,16 @@ function launchWebAuthFlow(url) {
   });
 }
 
-/** Turn a browser message into one a cataloguer can act on. */
+/** Change a browser error into a message for the user. */
 function signInFailure(message) {
   const text = String(message ?? '');
-  if (/cancel|closed|did not approve/i.test(text)) return 'The sign-in was cancelled.';
-  return text ? `The sign-in did not finish. ${text}` : 'The sign-in did not finish.';
+  if (/cancel|closed|did not approve/i.test(text)) return 'You cancelled the sign-in.';
+  return text ? `The sign-in did not complete. ${text}` : 'The sign-in did not complete.';
 }
 
 /* ---------- storage ---------- */
 
-/** True when the local extension store is available. */
+/** Return true if the local extension storage is available. */
 function hasLocal() {
   return Boolean(globalThis.chrome?.storage?.local);
 }
@@ -297,7 +268,7 @@ async function readLocal(key) {
     const got = await chrome.storage.local.get(key);
     return got?.[key];
   } catch {
-    // A storage failure reads as signed out, which fails safe.
+    // A storage failure gives the signed-out state. This is the safe result.
     return undefined;
   }
 }
@@ -307,7 +278,7 @@ async function writeLocal(key, value) {
   try {
     await chrome.storage.local.set({ [key]: value });
   } catch {
-    // Nothing useful to do. The next read reports signed out.
+    // Ignore the failure. The next read gives the signed-out state.
   }
 }
 
@@ -316,12 +287,12 @@ async function removeLocal(keys) {
   try {
     await chrome.storage.local.remove(keys);
   } catch {
-    // As above.
+    // Ignore the failure.
   }
 }
 
 /**
- * An error carrying a code, so a caller can act on the kind.
+ * Make an error with a code, so that the caller can identify the type.
  * @param {string} message
  * @param {string} code
  */

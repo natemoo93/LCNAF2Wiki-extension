@@ -1,6 +1,6 @@
 /**
- * LCSH occupation terms into Wikidata style: "Sociologists" to "sociologist".
- * The singulariser is a rules table, not a stemmer, because the list is small.
+ * Change LCSH occupation terms to Wikidata style. Example: "Sociologists" to "sociologist".
+ * The singular forms come from a table of rules, not a stemmer.
  */
 
 /** Plurals that do not end with -s. */
@@ -13,8 +13,8 @@ const IRREGULAR = {
 };
 
 /**
- * Words that end with -s and are already singular. Without this list,
- * "physics" becomes "physic" and "news" becomes "new".
+ * Words that end with -s and are singular.
+ * Without this list, "physics" becomes "physic".
  */
 const INVARIANT = new Set([
   'personnel',
@@ -38,7 +38,7 @@ const INVARIANT = new Set([
  * @returns {string}
  */
 function singularizeWord(word) {
-  // Keep the punctuation at the end out of the morphology.
+  // Do not change the punctuation at the end.
   const bare = word.replace(/[^\p{L}\p{M}'-]+$/u, '');
   const tail = word.slice(bare.length);
   const lower = bare.toLowerCase();
@@ -57,9 +57,8 @@ function singularizeWord(word) {
 }
 
 /**
- * Make the head noun of each coordinated phrase singular. "Motion picture
- * producers and directors" has two head nouns, not one.
- *
+ * Make the head noun of each coordinated phrase singular.
+ * Example: "Motion picture producers and directors" has two head nouns.
  * @param {string} phrase
  * @returns {string}
  */
@@ -83,9 +82,8 @@ function singularizePhrase(phrase) {
 }
 
 /**
- * Change one LCSH occupation term to Wikidata style. Subdivisions ("--") and
- * qualifiers stay, because interpreting them needs LCSH semantics.
- *
+ * Change one LCSH occupation term to Wikidata style.
+ * Do not change subdivisions ("--") or qualifiers.
  * @param {string} raw e.g. "Deans (Education)"
  * @returns {string} e.g. "dean (education)"
  */
@@ -94,13 +92,13 @@ export function normalizeOccupation(raw) {
   if (!term) return '';
 
   const normalized = term
-    // LCSH subdivision: each facet has its own head noun.
+    // Each LCSH subdivision has its own head noun.
     .split('--')
     .map((facet) => {
       const qualified = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(facet.trim());
       if (qualified) {
-        // "Deans (Education)": the head is before the parenthesis; the
-        // qualifier is a scope note and stays as-is.
+        // In "Deans (Education)", the head is before the parenthesis.
+        // Do not change the qualifier.
         return `${singularizePhrase(qualified[1])} (${qualified[2]})`;
       }
       return singularizePhrase(facet.trim());
@@ -111,7 +109,7 @@ export function normalizeOccupation(raw) {
 }
 
 /**
- * True when a term keeps LCSH syntax a cataloguer may want to rewrite.
+ * Return true if a term has LCSH syntax that a person can rewrite.
  * @param {string} raw
  * @returns {boolean}
  */
@@ -120,8 +118,7 @@ export function isAwkwardTerm(raw) {
 }
 
 /**
- * Build a description from the occupation terms: lowercase, comma-separated.
- *
+ * Make a description from the occupation terms, in lowercase with commas.
  * @param {string[]} terms
  * @returns {string}
  */

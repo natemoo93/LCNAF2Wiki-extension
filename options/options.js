@@ -1,6 +1,5 @@
 /**
- * Settings page controller. Each change is written immediately, and the
- * control itself is the confirmation.
+ * Control the settings page. Write each change immediately.
  */
 
 import { getSettings, setSetting } from '../core/settings.js';
@@ -16,10 +15,10 @@ import {
   REGISTER_URL,
 } from '../core/auth.js';
 
-/** Where the documentation link points. One constant, so it is one change. */
+/** The address of the documentation link. */
 const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
 
-/** Where a user withdraws the permission they gave this extension. */
+/** The page where a user withdraws the permission for this extension. */
 const GRANTS_URL = 'https://meta.wikimedia.org/wiki/Special:OAuthManageMyGrants';
 
 const dupToggle = document.getElementById('check-duplicates');
@@ -31,8 +30,7 @@ const filterList = document.getElementById('filters');
 const addFilterButton = document.getElementById('add-filter');
 
 /**
- * The filters as the page holds them. The rows are the truth while editing,
- * and this is written to the store on every change.
+ * The filters on the page. Write them to storage after each change.
  * @type {{replace: string, with: string}[]}
  */
 let filters = [];
@@ -43,13 +41,11 @@ async function init() {
   document.getElementById('docs').href = DOCS_URL;
   document.getElementById('register').href = REGISTER_URL;
 
-  // The callback address is derived from the extension id, so it is shown
-  // rather than typed. Registering the wrong one is the usual first failure.
+  // Show the callback address. The browser makes it from the extension ID.
   try {
     redirectBox.textContent = getRedirectUri();
   } catch {
-    // An older browser with no identity API. The sign-in cannot run, and
-    // the account panel says so.
+    // An old browser has no identity API. The account panel tells the user.
   }
 
   const settings = await getSettings();
@@ -72,17 +68,15 @@ async function init() {
   addFilterButton.addEventListener('click', () => {
     filters.push({ replace: '', with: '' });
     renderFilters();
-    // Put the cursor in the row that was just made.
+    // Put the cursor in the new row.
     filterList.querySelector('.filter-row:last-child .filter-from')?.focus();
   });
 
-  // The field holds the override only. Showing the built-in id here would
-  // read as a value the user had typed, and clearing it would do nothing.
+  // Show only a stored client ID. Do not show the built-in ID.
   const active = await getClientId();
   clientInput.value = active === getBuiltInClientId() ? '' : active;
 
-  // Write on blur, not on every keystroke, because each write signs the user
-  // out when the value changes.
+  // Write on blur, not on each keystroke, because a change signs the user out.
   clientInput.addEventListener('change', async () => {
     await setClientId(clientInput.value);
     await renderAccount();
@@ -91,7 +85,7 @@ async function init() {
   await renderAccount();
 }
 
-/** Paint the account panel from the session as it now is. */
+/** Show the account panel for the current session. */
 async function renderAccount() {
   const session = await getSession();
 
@@ -101,9 +95,9 @@ async function renderAccount() {
 
     accountState.replaceChildren(
       note(`Signed in as ${username}.`, 'state-ok'),
-      // A blocked account cannot edit, and the API would refuse the save.
-      ...(blocked ? [note('This account is blocked. Edits will be refused.', 'state-warn')] : []),
-      ...(canEdit ? [] : [note('This account has no edit right.', 'state-warn')]),
+      // A blocked account cannot edit. The API refuses the save.
+      ...(blocked ? [note('This account is blocked. Wikidata will refuse its edits.', 'state-warn')] : []),
+      ...(canEdit ? [] : [note('This account does not have the edit right.', 'state-warn')]),
       actions(
         button('Sign out', async () => {
           await signOut();
@@ -111,26 +105,26 @@ async function renderAccount() {
         }),
         link('Manage permission on Wikimedia', GRANTS_URL),
       ),
-      note('Signing out forgets the token here. The permission stays until withdrawn.'),
+      note('Sign-out removes the token from this computer. The permission stays until you withdraw it.'),
     );
     return;
   }
 
   if (session.state === 'unconfigured') {
-    // Only a source build with the constant still empty reaches this.
+    // This occurs only in a source version with an empty client ID.
     accountState.replaceChildren(
-      note('No OAuth client id in this build. Add one under Advanced.', 'state-warn'),
+      note('This version has no OAuth client ID. Add a client ID under Advanced.', 'state-warn'),
     );
     return;
   }
 
   accountState.replaceChildren(
-    note('Not signed in. Items still save, credited to a temporary account.'),
+    note('You are not signed in. Items save with a temporary account.'),
     actions(button('Sign in to Wikidata', startSignIn, 'primary')),
   );
 }
 
-/** Run the sign-in and report the outcome in place. */
+/** Run the sign-in and show the result. */
 async function startSignIn() {
   accountState.replaceChildren(note('Waiting for Wikidata…'));
 
@@ -148,7 +142,7 @@ async function startSignIn() {
 
 /* ---------- text filters ---------- */
 
-/** Paint every filter row. */
+/** Show all filter rows. */
 function renderFilters() {
   filterList.replaceChildren();
 
@@ -157,17 +151,15 @@ function renderFilters() {
   }
 
   if (filters.length === 0) {
-    filterList.append(note('No filters. The record text is used as it arrives.'));
+    filterList.append(note('No filters set.'));
   }
 
-  // The store has a size limit, so the list has an end.
+  // The storage has a size limit, so the number of filters has a limit.
   addFilterButton.disabled = filters.length >= MAX_FILTERS;
 }
 
 /**
- * One filter: the text to replace, the text to put in its place, and a
- * button to remove the row.
- *
+ * Make one filter row: the text to replace, the new text, and a remove button.
  * @param {{replace: string, with: string}} filter
  * @param {number} index
  */
@@ -202,8 +194,7 @@ function filterRow(filter, index) {
 }
 
 /**
- * One labelled field in a filter row.
- *
+ * Make one labeled field in a filter row.
  * @param {string} label
  * @param {string} value
  * @param {string} className
@@ -223,14 +214,14 @@ function filterInput(label, value, className, onChange) {
   input.value = value ?? '';
   input.autocomplete = 'off';
   input.spellcheck = false;
-  // Write as the user types, so a filter is never half saved.
+  // Write each keystroke, so that the saved filter is always complete.
   input.addEventListener('input', () => onChange(input.value));
 
   wrap.append(name, input);
   return wrap;
 }
 
-/** Write the filters, dropping any row that cannot be used. */
+/** Write the filters. Remove rows that are not usable. */
 function saveFilters() {
   setSetting('textFilters', cleanFilters(filters));
 }

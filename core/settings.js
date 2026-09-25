@@ -1,14 +1,11 @@
 /**
- * Extension settings in chrome.storage.sync, with a memory fallback.
- * getSettings always gives a complete object, with defaults for missing keys.
+ * Keep the settings in chrome.storage.sync, or in memory if it is not available.
+ * getSettings always gives a complete object. Missing keys get their defaults.
  */
 
 import { cleanFilters } from './filters.js';
 
-/**
- * The default value of each setting. The duplicate check is on, because a
- * duplicate item costs more work than the request it takes to find one.
- */
+/** The default value of each setting. */
 export const DEFAULTS = {
   checkDuplicates: true,
   saveMethod: 'api',
@@ -16,23 +13,21 @@ export const DEFAULTS = {
 };
 
 /**
- * How an item reaches Wikidata: 'api' saves it from the popup, after the
- * confirm step; 'form' opens a prefilled Special:NewItem instead.
+ * The save methods. 'api' saves from the popup after the confirm step.
+ * 'form' opens a prefilled Special:NewItem.
  */
 export const SAVE_METHODS = ['api', 'form'];
 
-/** Holds the settings when chrome.storage is not available. */
+/** The settings when chrome.storage is not available. */
 let memory = { ...DEFAULTS };
 
-/** True when the extension storage API is available. */
+/** Return true if the extension storage API is available. */
 function hasStorage() {
   return Boolean(globalThis.chrome?.storage?.sync);
 }
 
 /**
- * Read all the settings. A missing key gets its default, so a new setting
- * needs no migration step.
- *
+ * Read all the settings. A missing key gets its default.
  * @returns {Promise<typeof DEFAULTS>}
  */
 export async function getSettings() {
@@ -42,15 +37,13 @@ export async function getSettings() {
     const stored = await chrome.storage.sync.get(DEFAULTS);
     return clean({ ...DEFAULTS, ...stored });
   } catch {
-    // A storage failure must not stop the popup.
+    // Use the defaults if storage fails. The popup must continue.
     return { ...DEFAULTS };
   }
 }
 
 /**
- * Replace an incorrect stored value with its default, so a damaged store
- * cannot leave a control with nothing selected.
- *
+ * Replace an incorrect stored value with its default.
  * @param {typeof DEFAULTS} s
  * @returns {typeof DEFAULTS}
  */
@@ -65,7 +58,6 @@ function clean(s) {
 
 /**
  * Write one setting.
- *
  * @param {keyof typeof DEFAULTS} key
  * @param {boolean | string | object[]} value
  * @returns {Promise<void>}
@@ -77,6 +69,6 @@ export async function setSetting(key, value) {
   try {
     await chrome.storage.sync.set({ [key]: value });
   } catch {
-    // The value stays in memory for this popup.
+    // Keep the value in memory for this popup.
   }
 }

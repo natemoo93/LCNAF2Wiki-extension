@@ -1,27 +1,19 @@
 /**
- * OAuth 2.0 authorization code flow with PKCE, for Wikimedia.
- * Pure protocol work: builds URLs, makes the code challenge, trades a code
- * for tokens. It never touches chrome.* or storage, so it runs under Node.
- *
- * The extension is a public client. It holds no client secret, because
- * anything shipped in an extension is readable. PKCE replaces the secret:
- * the verifier stays in memory and proves the code came from this client.
+ * Run the OAuth 2.0 authorization code flow with PKCE for Wikimedia.
+ * This module does not use chrome.* or storage, so it runs in Node.
  */
 
-/** Where the user approves the request, and where tokens are traded. */
+/** The approval page and the token endpoint. */
 const AUTHORIZE_URL = 'https://www.wikidata.org/w/rest.php/oauth2/authorize';
 const TOKEN_URL = 'https://www.wikidata.org/w/rest.php/oauth2/access_token';
 
-/** Who the signed-in user is. An incomplete OpenID Connect UserInfo. */
+/** The profile of the signed-in user. It is a partial OpenID Connect UserInfo. */
 const PROFILE_URL = 'https://www.wikidata.org/w/rest.php/oauth2/resource/profile';
 
 /** The maximum wait for a token or profile request. */
 const TIMEOUT_MS = 15000;
 
-/**
- * Seconds of headroom before a token counts as expired. A token that expires
- * during a request would fail the edit, so it is refreshed early.
- */
+/** Refresh a token this number of seconds before it expires. */
 const EXPIRY_SKEW_S = 120;
 
 /**
@@ -34,9 +26,7 @@ const EXPIRY_SKEW_S = 120;
 
 /**
  * Make a PKCE verifier and its challenge.
- * The verifier is a random string; the challenge is its SHA-256, so the
- * authorization server never sees the verifier until the trade.
- *
+ * The challenge is the SHA-256 of the verifier.
  * @returns {Promise<{verifier: string, challenge: string}>}
  */
 export async function createPkcePair() {
@@ -46,8 +36,7 @@ export async function createPkcePair() {
 }
 
 /**
- * Build the address where the user approves the request.
- *
+ * Make the address of the approval page.
  * @param {{clientId: string, redirectUri: string, challenge: string, state: string}} opts
  * @returns {string}
  */
@@ -64,16 +53,15 @@ export function authorizeUrl({ clientId, redirectUri, challenge, state }) {
 }
 
 /**
- * Read the authorization code out of the address the browser came back to.
- * The state must match the one sent, or the answer is not ours.
- *
+ * Get the authorization code from the redirect address.
+ * The state must be the same as the state in the request.
  * @param {string} redirectUrl
  * @param {string} expectedState
  * @returns {string} the authorization code
  */
 export function readCallback(redirectUrl, expectedState) {
   const url = new URL(redirectUrl);
-  // The parameters can arrive in the query or the fragment.
+  // The parameters can be in the query or in the fragment.
   const params = new URLSearchParams(url.search || url.hash.replace(/^#/, ''));
 
   const error = params.get('error');
@@ -83,19 +71,18 @@ export function readCallback(redirectUrl, expectedState) {
 
   const state = params.get('state');
   if (state !== expectedState) {
-    // A mismatch means the answer belongs to a different request.
-    throw authError('The sign-in answer did not match the request.', 'state-mismatch');
+    // A different state means that the answer is for a different request.
+    throw authError('The sign-in answer is not for this request.', 'state-mismatch');
   }
 
   const code = params.get('code');
-  if (!code) throw authError('The sign-in answer carried no code.', 'no-code');
+  if (!code) throw authError('The sign-in answer has no code.', 'no-code');
 
   return code;
 }
 
 /**
- * Trade an authorization code for tokens.
- *
+ * Exchange an authorization code for tokens.
  * @param {{clientId: string, code: string, verifier: string, redirectUri: string}} opts
  * @returns {Promise<TokenSet>}
  */
@@ -111,9 +98,8 @@ export async function exchangeCode({ clientId, code, verifier, redirectUri }) {
 }
 
 /**
- * Trade a refresh token for a new access token. Wikimedia expires an access
- * token after about four hours, so a long session refreshes several times.
- *
+ * Exchange a refresh token for a new access token.
+ * An access token from Wikimedia expires after approximately four hours.
  * @param {{clientId: string, refreshToken: string}} opts
  * @returns {Promise<TokenSet>}
  */
@@ -126,8 +112,7 @@ export async function refreshTokens({ clientId, refreshToken }) {
 }
 
 /**
- * Ask who the token belongs to.
- *
+ * Get the account that owns the token.
  * @param {string} accessToken
  * @param {string} userAgent
  * @returns {Promise<{username: string, sub: string, blocked: boolean, rights: string[]}>}
@@ -145,9 +130,9 @@ export async function fetchProfile(accessToken, userAgent) {
   );
 
   if (res.status === 401 || res.status === 403) {
-    throw authError('The sign-in has expired. Sign in again.', 'unauthorized');
+    throw authError('Your sign-in is expired. Sign in again.', 'unauthorized');
   }
-  if (!res.ok) throw authError(`Wikidata returned ${res.status}.`, 'profile-failed');
+  if (!res.ok) throw authError(`Wikidata sent error ${res.status}.`, 'profile-failed');
 
   const data = await res.json();
   return {
@@ -159,8 +144,7 @@ export async function fetchProfile(accessToken, userAgent) {
 }
 
 /**
- * True when a token set is missing, or close enough to expiry to refresh.
- *
+ * Return true if the token set is missing or is almost expired.
  * @param {TokenSet | undefined} tokens
  * @param {number} [now] milliseconds, for the tests
  * @returns {boolean}
@@ -172,8 +156,7 @@ export function isExpired(tokens, now = Date.now()) {
 }
 
 /**
- * POST to the token endpoint and read the answer into a TokenSet.
- *
+ * Send a POST to the token endpoint and read the answer into a TokenSet.
  * @param {Record<string, string>} body
  * @returns {Promise<TokenSet>}
  */
@@ -193,33 +176,31 @@ async function tokenRequest(body) {
     );
   } catch (cause) {
     if (cause?.code) throw cause;
-    throw authError(`Could not reach Wikidata. ${cause.message}`, 'network');
+    throw authError(`Cannot connect to Wikidata. ${cause.message}`, 'network');
   }
 
   let data;
   try {
     data = await res.json();
   } catch {
-    throw authError(`Wikidata returned ${res.status} with no readable answer.`, 'token-failed');
+    throw authError(`Wikidata sent error ${res.status} with no usable answer.`, 'token-failed');
   }
 
   if (!res.ok || data.error) {
-    // invalid_grant means the refresh token is spent or withdrawn. The
-    // caller signs the user out, because no retry can fix it.
+    // invalid_grant means that the refresh token is used or withdrawn.
     const code = data.error === 'invalid_grant' ? 'invalid-grant' : 'token-failed';
     throw authError(
-      data.error_description || data.error || `Wikidata returned ${res.status}.`,
+      data.error_description || data.error || `Wikidata sent error ${res.status}.`,
       code,
     );
   }
 
-  if (!data.access_token) throw authError('Wikidata returned no access token.', 'token-failed');
+  if (!data.access_token) throw authError('Wikidata did not send an access token.', 'token-failed');
 
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
-    // expires_in is seconds from now. Storing the moment avoids keeping a
-    // countdown across a service worker that stops and starts.
+    // Store the expiry time, because the service worker can stop and start.
     expiresAt: Date.now() + Number(data.expires_in ?? 14400) * 1000,
   };
 }
@@ -235,7 +216,7 @@ async function withTimeout(run) {
     return await run(ctl.signal);
   } catch (cause) {
     if (cause?.name === 'AbortError') {
-      throw authError('Wikidata did not answer in time.', 'timeout');
+      throw authError('Wikidata did not answer in the time limit.', 'timeout');
     }
     throw cause;
   } finally {
@@ -243,14 +224,14 @@ async function withTimeout(run) {
   }
 }
 
-/** A plain-language message for an OAuth error code. */
+/** Get a message for the user from an OAuth error code. */
 function describeError(code) {
-  if (code === 'access_denied') return 'The sign-in was declined.';
+  if (code === 'access_denied') return 'You declined the sign-in.';
   return `The sign-in failed (${code}).`;
 }
 
 /**
- * An error carrying a code, so a caller can act on the kind.
+ * Make an error with a code, so that the caller can identify the type.
  * @param {string} message
  * @param {string} code
  */
@@ -260,14 +241,14 @@ function authError(message, code) {
   return err;
 }
 
-/** A random URL-safe string of the given length. */
+/** Make a random URL-safe string of the given length. */
 function randomUrlSafe(length) {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return base64Url(bytes).slice(0, length);
 }
 
-/** Base64url, as PKCE and JWT use: no padding, and two characters swapped. */
+/** Encode as base64url, with no padding. PKCE and JWT use this encoding. */
 function base64Url(bytes) {
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);

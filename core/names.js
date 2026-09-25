@@ -1,15 +1,13 @@
 /**
- * Name inversion. LCNAF puts the surname first; Wikidata uses direct order.
- * The first indicator gives the shape: "1" is surname first, "0" is not.
+ * Invert names. LCNAF puts the surname first, and Wikidata uses direct order.
+ * An ind1 of "1" is surname first. An ind1 of "0" is direct order.
  */
 
-/** MARC punctuation at the end: a comma or a period used as a separator. */
+/** A comma or a period that MARC puts at the end as a separator. */
 const TRAILING_PUNCT = /[,.]+\s*$/;
 
 /**
- * A name that cannot be inverted with confidence still gives a `direct` value
- * and a reason, so a person can correct it.
- *
+ * A name with low confidence also has a `direct` value and a reason for a person to examine.
  * @typedef {'high' | 'low'} Confidence
  * @typedef {{
  *   direct: string,
@@ -22,17 +20,16 @@ const TRAILING_PUNCT = /[,.]+\s*$/;
 
 /**
  * Invert one MARC name heading into direct order.
- *
  * @param {string} rawA the value of subfield $a
  * @param {{ind1?: string, titleWords?: string}} [opts]
- *   `titleWords` is $c, which is reported but never placed automatically.
+ *   `titleWords` is $c. The tool reports it but does not put it in position.
  * @returns {ParsedName}
  */
 export function invertName(rawA, opts = {}) {
   const cleaned = stripTrailingPunct(stripDates(rawA ?? ''));
 
   if (!cleaned) {
-    return { direct: '', confidence: 'low', reason: 'Empty $a.' };
+    return { direct: '', confidence: 'low', reason: '$a is empty.' };
   }
 
   // An ind1 of "0" is already in direct order ("Aristotle").
@@ -43,12 +40,11 @@ export function invertName(rawA, opts = {}) {
   const commas = countCommas(cleaned);
 
   if (commas === 0) {
-    // No comma to divide at. Usual for single names, but also the shape of
-    // an incorrect heading, so report it when ind1 gives surname first.
+    // A single name has no comma. If ind1 shows surname first, report it.
     return {
       direct: cleaned,
       confidence: opts.ind1 === '1' ? 'low' : 'high',
-      reason: opts.ind1 === '1' ? 'Marked surname-first but has no comma.' : undefined,
+      reason: opts.ind1 === '1' ? 'The indicator shows surname first, but the name has no comma.' : undefined,
     };
   }
 
@@ -59,37 +55,36 @@ export function invertName(rawA, opts = {}) {
 
   if (commas > 1) {
     // A second comma usually shows an epithet, not a forename.
-    // "Ludwig II, King of Bavaria" would invert incorrectly.
+    // Example: "Ludwig II, King of Bavaria".
     return {
       direct,
       surname,
       forename: rest,
       confidence: 'low',
-      reason: 'More than one comma. May be an epithet or qualifier, not a forename.',
+      reason: 'The name has more than one comma. The text can be an epithet or a qualifier, not a forename.',
     };
   }
 
   if (looksLikeEpithet(rest)) {
-    // One comma, but the text after it is a title. Function words identify
-    // this condition, because forenames do not contain them.
+    // The text after the comma is a title. Function words show this.
     return {
       direct,
       surname,
       forename: rest,
       confidence: 'low',
-      reason: 'Text after the comma reads as a title or epithet, not a forename.',
+      reason: 'The text after the comma is possibly a title or epithet, not a forename.',
     };
   }
 
   if (opts.titleWords) {
-    // The position of $c is ambiguous: "Sir John Smith" but "Irwin B.
-    // Rothschild III". Return the base name and set a flag.
+    // The position of $c is not clear. Return the base name with low confidence.
+    // Examples: "Sir John Smith" and "Irwin B. Rothschild III".
     return {
       direct,
       surname,
       forename: rest,
       confidence: 'low',
-      reason: `$c "${opts.titleWords}" is not placed automatically.`,
+      reason: `Put $c "${opts.titleWords}" in position manually.`,
     };
   }
 
@@ -111,20 +106,16 @@ export function stripDates(raw) {
  * @returns {string}
  */
 export function stripTrailingPunct(raw) {
-  // Remove the comma first. In "Rothschild, Irwin B.," the period before
-  // it belongs to the initial.
+  // Remove the comma first. In "Rothschild, Irwin B.," the period is part of the initial.
   const s = raw.replace(/,\s*$/, '').trim();
 
-  // An initial keeps its period. Do not change "Sween, Joyce A." to
-  // "Joyce A".
+  // Keep the period of an initial. Do not change "Sween, Joyce A." to "Joyce A".
   if (/(^|\s)\p{Lu}\.$/u.test(s)) return s;
 
   return s.replace(TRAILING_PUNCT, '').trim();
 }
 
-/**
- * Function words that occur in titles and epithets but not in forenames.
- */
+/** Function words that occur in titles and epithets but not in forenames. */
 const EPITHET_WORDS = /\b(of|de|del|della|di|van|von|the|d')\b/i;
 
 /**

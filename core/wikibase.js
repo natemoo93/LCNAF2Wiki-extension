@@ -1,11 +1,6 @@
 /**
- * The Wikidata REST API write client.
- *
- * A write carries a bearer token when the user is signed in. Wikidata also
- * takes the edit without one, and credits it to a temporary account, so a
- * token is optional here rather than required. The Item namespace is exempt
- * from ConfirmEdit, so a signed-out write meets no CAPTCHA; what it does
- * meet is a limit of eight edits a minute.
+ * Write to the Wikidata REST API. The bearer token is optional.
+ * Without a token, Wikidata uses a temporary account and a limit of eight edits a minute.
  */
 
 import { USER_AGENT } from './wikidata.js';
@@ -17,7 +12,7 @@ const BASE = 'https://www.wikidata.org/w/rest.php/wikibase/v1';
 /** The address of a Wikidata item page. */
 const ITEM_URL = 'https://www.wikidata.org/wiki/';
 
-/** The maximum wait. A write is slower than a read. */
+/** The maximum wait. A write takes more time than a read. */
 const TIMEOUT_MS = 20000;
 
 /**
@@ -30,23 +25,21 @@ const TIMEOUT_MS = 20000;
 
 /**
  * Create an item from a draft.
- *
  * @param {import('./mapper.js').WikidataDraft} draft
  * @param {{accessToken?: string, signal?: AbortSignal, now?: Date}} opts
- *   accessToken is optional. Without one the edit is anonymous.
+ *   accessToken is optional. Without it, the edit is anonymous.
  * @returns {Promise<CreatedItem>}
  */
 export async function createItem(draft, opts) {
-  // An item with neither a label nor a description is refused by the API,
-  // and would be useless anyway.
+  // The API refuses an item with no label and no description.
   if (!draft?.label && !draft?.description) {
-    throw apiError('An item needs a label or a description.', 'empty-item');
+    throw apiError('An item must have a label or a description.', 'empty-item');
   }
 
   const body = buildItemBody(draft, { now: opts.now });
   const data = await request('POST', '/entities/items', body, opts);
 
-  if (!data?.id) throw apiError('Wikidata saved the item but returned no id.', 'no-id');
+  if (!data?.id) throw apiError('Wikidata saved the item but did not send its ID.', 'no-id');
 
   return {
     id: data.id,
@@ -56,9 +49,7 @@ export async function createItem(draft, opts) {
 }
 
 /**
- * Read an item. Unauthenticated, because a read needs no identity, but the
- * User-Agent is still sent as the policy asks.
- *
+ * Read an item. Do not send a token. Send the User-Agent, as the policy tells.
  * @param {string} itemId
  * @param {{signal?: AbortSignal}} [opts]
  * @returns {Promise<object>}
@@ -68,9 +59,7 @@ export async function getItem(itemId, opts = {}) {
 }
 
 /**
- * Add one statement to an item that exists. This is what fills in a P244 on
- * an item that a name match found.
- *
+ * Add one statement to an item that exists.
  * @param {string} itemId
  * @param {object} statement
  * @param {{accessToken?: string, comment?: string, signal?: AbortSignal}} opts
@@ -91,11 +80,8 @@ export async function addStatement(itemId, statement, opts) {
 }
 
 /**
- * Add to an item that exists, with a JSON Patch.
- *
- * The patch carries only `add` operations, so this can grow an item and
- * never shrink it. Refer to core/diff.js for how the patch is built.
- *
+ * Add to an item that exists, with a JSON Patch of `add` operations only.
+ * Refer to core/diff.js for the patch.
  * @param {string} itemId
  * @param {object[]} patch
  * @param {{accessToken?: string, comment?: string, signal?: AbortSignal}} opts
@@ -103,14 +89,14 @@ export async function addStatement(itemId, statement, opts) {
  */
 export async function patchItem(itemId, patch, opts = {}) {
   if (!Array.isArray(patch) || patch.length === 0) {
-    throw apiError('Nothing to add.', 'empty-patch');
+    throw apiError('There is nothing to add.', 'empty-patch');
   }
 
-  // Refuse anything that is not an addition, whatever the caller passed.
-  // This is the last place to stop a write that would remove data.
+  // Refuse all operations that are not additions.
+  // This is the last check before a write that removes data.
   const destructive = patch.find((op) => op?.op !== 'add');
   if (destructive) {
-    throw apiError(`Refused a "${destructive.op}" operation. This tool only adds.`, 'not-additive');
+    throw apiError(`The tool refused a "${destructive.op}" operation. This tool only adds data.`, 'not-additive');
   }
 
   const body = {
@@ -122,9 +108,8 @@ export async function patchItem(itemId, patch, opts = {}) {
 }
 
 /**
- * One request against the REST API.
- * The Authorization header is set only when a token is given.
- *
+ * Send one request to the REST API.
+ * Set the Authorization header only if a token is given.
  * @param {string} method
  * @param {string} path
  * @param {object | undefined} body
@@ -134,11 +119,11 @@ export async function patchItem(itemId, patch, opts = {}) {
 async function request(method, path, body, opts = {}) {
   const headers = {
     Accept: 'application/json',
-    // A browser cannot set User-Agent, so Wikimedia also reads this one.
+    // A browser cannot set User-Agent, so Wikimedia also reads this header.
     'Api-User-Agent': USER_AGENT,
   };
   if (body) {
-    // The patch endpoints take JSON Patch; everything else takes plain JSON.
+    // The patch endpoints use JSON Patch. The other endpoints use JSON.
     headers['Content-Type'] =
       method === 'PATCH' ? 'application/json-patch+json' : 'application/json';
   }
@@ -160,11 +145,11 @@ async function request(method, path, body, opts = {}) {
     if (cause?.name === 'AbortError') {
       const stopped = opts.signal?.aborted;
       throw apiError(
-        stopped ? 'The edit was cancelled.' : 'Wikidata did not answer in time.',
+        stopped ? 'You cancelled the edit.' : 'Wikidata did not answer in the time limit.',
         stopped ? 'cancelled' : 'timeout',
       );
     }
-    throw apiError(`Could not reach Wikidata. ${cause.message}`, 'network');
+    throw apiError(`Cannot connect to Wikidata. ${cause.message}`, 'network');
   } finally {
     clearTimeout(t);
   }
@@ -182,46 +167,43 @@ async function request(method, path, body, opts = {}) {
 }
 
 /**
- * Turn an API failure into an error a cataloguer can act on.
- *
+ * Change an API failure into an error for the user.
  * @param {Response} res
  * @param {object | undefined} data
  */
 function responseError(res, data) {
-  // The REST API names its failures in errorKey, and gives a message in
-  // whichever languages it has.
+  // The REST API gives the failure in errorKey, and a message in some languages.
   const key = data?.errorKey ?? data?.code ?? '';
   const message = data?.messageTranslations?.en ?? data?.message ?? '';
 
   if (res.status === 401) {
-    // The token was rejected. A retry signed out would succeed, so the
-    // caller is told the sign-in lapsed rather than that the save failed.
-    return apiError('The sign-in has expired.', 'signed-out');
+    // Wikidata refused the token. Tell the caller that the sign-in is expired.
+    return apiError('Your sign-in is expired.', 'signed-out');
   }
   if (res.status === 403) {
-    // A block, or a missing right. The message says which.
+    // The account is blocked or does not have a right. The message tells which.
     return apiError(
-      message || 'Wikidata refused the edit. The account may be blocked or lack rights.',
+      message || 'Wikidata refused the edit. The account can be blocked or not have the necessary rights.',
       'forbidden',
     );
   }
   if (res.status === 409 || res.status === 412) {
-    // The item changed since it was read, so the patch no longer applies.
-    return apiError('The item changed on Wikidata. Look it up again.', 'conflict');
+    // The item changed after the read, so the patch is not correct now.
+    return apiError('The item changed on Wikidata. Find it again.', 'conflict');
   }
   if (res.status === 429) {
-    return apiError('Wikidata is rate-limiting the edit. Wait, then try again.', 'rate-limit');
+    return apiError('Wikidata limits the rate of edits. Wait, then try again.', 'rate-limit');
   }
   if (res.status === 422 || res.status === 400) {
-    // The data was refused: a duplicate label and description pair, for one.
+    // Wikidata refused the data. An example is a duplicate label and description.
     return apiError(message || 'Wikidata refused the data.', key || 'invalid');
   }
 
-  return apiError(message || `Wikidata returned ${res.status}.`, key || 'failed');
+  return apiError(message || `Wikidata sent error ${res.status}.`, key || 'failed');
 }
 
 /**
- * An error carrying a code, so a caller can act on the kind.
+ * Make an error with a code, so that the caller can identify the type.
  * @param {string} message
  * @param {string} code
  */
@@ -232,9 +214,8 @@ function apiError(message, code) {
 }
 
 /**
- * Make one signal that aborts when any given signal aborts.
- * AbortSignal.any is not in every browser version, so this does the same.
- *
+ * Make one signal that aborts when one of the given signals aborts.
+ * Some browser versions do not have AbortSignal.any.
  * @param {(AbortSignal | undefined)[]} signals
  * @returns {AbortSignal}
  */

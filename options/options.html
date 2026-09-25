@@ -16,13 +16,11 @@
         <h2>Wikidata account</h2>
 
         <p class="setting-note">
-          Optional. Items save either way. Signed out, an edit is credited to a
-          temporary account and capped at eight edits a minute; signed in, it is
-          credited to you and the cap is far higher.
+          Optional. When signed in, Wikidata credits your account with the edit.
         </p>
 
         <div id="account-state" class="account-state">
-          <p class="setting-note">Reading the sign-in…</p>
+          <p class="setting-note">Reading the sign-in state…</p>
         </div>
 
         <details class="advanced">
@@ -32,15 +30,9 @@
             <span class="setting-text">
               <span class="setting-name">Text filters</span>
               <span class="setting-note">
-                Replace text as it is read from the record, before the fields are
-                built. Use this for a character LC does not send correctly, or
-                one your workflow always rewrites.
-              </span>
-              <span class="setting-note">
-                Each filter is literal text, not a pattern. Filters run in order,
-                and apply to the name, the variant names and the occupations.
-              </span>
-
+                Use a filter for a character that LC does not send correctly, or
+                for text that you always change.
+              </span>      
               <div id="filters" class="filters"></div>
 
               <button type="button" id="add-filter" class="btn btn-add">
@@ -51,26 +43,24 @@
 
           <div class="setting setting-block">
             <span class="setting-text">
-              <span class="setting-name">A different OAuth client</span>
-              <span class="setting-note">
-                LCNAF2Wiki comes with a registered client, so this can stay empty.
-                Fill it in only to sign in through a different one, such as an
-                institutional client. Changing it signs you out.
+              <span class="setting-name">OAuth client</span>
+              <span class="setting-note">                
+                Enter a client ID only to sign in with a different client.
               </span>
               <input
                 type="text"
                 id="client-id"
                 class="text-input"
-                placeholder="(using the built-in client)"
+                placeholder="(the built-in client)"
                 autocomplete="off"
                 spellcheck="false"
               />
               <span class="setting-note">
-                Callback address for a new client:
-                <code id="redirect-uri" class="redirect">(this browser gives no address)</code>
-                Register as non-owner-only and non-confidential, with the
+                Callback address:
+                <code id="redirect-uri" class="redirect">(this browser does not give an address)</code>
+                <a id="register" href="#" target="_blank" rel="noreferrer">Register a client</a> as non-owner-only and non-confidential, with the
                 <strong>Create, edit, and move pages</strong> grant.
-                <a id="register" href="#" target="_blank" rel="noreferrer">Register a client</a>
+                
               </span>
             </span>
           </div>
@@ -86,8 +76,8 @@
           <span class="setting-text">
             <span class="setting-name">Save through the Wikidata API</span>
             <span class="setting-note">
-              Create the item from the popup, after a confirm step showing what
-              will be written. The item is public as soon as it saves.
+              Create the item from the popup. A confirm step shows the data before
+              the save.
             </span>
           </span>
         </label>
@@ -97,8 +87,7 @@
           <span class="setting-text">
             <span class="setting-name">Open a prefilled form</span>
             <span class="setting-note">
-              Open <strong>Special:NewItem</strong> with the fields filled in.
-              Nothing saves until you press Create there.
+              Open <strong>Special:NewItem</strong> on Wikidata with the fields filled in.              
             </span>
           </span>
         </label>
@@ -112,12 +101,8 @@
           <span class="setting-text">
             <span class="setting-name">Check for duplicates first</span>
             <span class="setting-note">
-              Search Wikidata for an existing item by P244, then VIAF, then name and
-              years. An identifier match is proof; a name match is not.
-            </span>
-            <span class="setting-note">
-              If the check fails, the button unlocks. A failed lookup is not evidence
-              that no item exists.
+              Search Wikidata for an item that exists. Search by P244, then VIAF,
+              then name plus years.
             </span>
           </span>
         </label>

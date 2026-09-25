@@ -1,6 +1,6 @@
 /**
- * MARCXML reader for the service worker, which has no DOMParser.
- * It accepts the MARCXML that id.loc.gov sends, not general XML.
+ * Read MARCXML in the service worker, which has no DOMParser.
+ * This reader accepts the MARCXML from id.loc.gov only, not general XML.
  */
 
 /** Decode the five XML entities and the numeric forms. */
@@ -39,7 +39,6 @@ function stripPrefix(name) {
 
 /**
  * Read a MARCXML string into a record.
- *
  * @param {string} xml
  * @param {string} id the LCNAF identifier
  * @returns {{id: string, fields: object[], controls: object[], source: string}}
@@ -48,17 +47,17 @@ function stripPrefix(name) {
 export function parseMarcLite(xml, id) {
   const text = String(xml ?? '');
 
-  // A comment can contain text that looks like a tag. Remove it first.
+  // A comment can contain text that looks like a tag. Remove comments first.
   const clean = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<\?[\s\S]*?\?>/g, '');
 
   if (!/<([\w.-]+:)?record[\s>]/.test(clean)) {
-    throw new Error(`Response for ${id} is not a MARCXML record.`);
+    throw new Error(`The response for ${id} is not a MARCXML record.`);
   }
 
   const fields = [];
   const controls = [];
 
-  // Each datafield, with the text inside it.
+  // Find each datafield and the text in it.
   const dfRe = /<([\w.-]+:)?datafield\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?datafield\s*>/g;
   let m;
   while ((m = dfRe.exec(clean))) {

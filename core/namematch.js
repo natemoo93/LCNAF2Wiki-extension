@@ -1,12 +1,11 @@
 /**
- * Name and date match against Wikidata, for records that no P244 search finds.
- * A match here is evidence, not proof, so the caller must let a person judge
- * it. Refer to the README.
+ * Find Wikidata items by name and dates, for records that the P244 search does not find.
+ * A match is evidence, not proof. A person must examine it.
  */
 
 import { USER_AGENT } from './wikidata.js';
 
-/** The query service reads live data, unlike the lagging search index. */
+/** The query service has current data. The search index can be late. */
 const SPARQL = 'https://query.wikidata.org/sparql';
 
 /** The address of a Wikidata item page. */
@@ -16,9 +15,8 @@ const ITEM_URL = 'https://www.wikidata.org/wiki/';
 const TIMEOUT_MS = 10000;
 
 /**
- * How many years two dates can differ and still count as the same date.
- * Birth and death years disagree by one across catalogues often enough that
- * an exact test misses real duplicates.
+ * The maximum difference in years between two dates that match.
+ * Catalogues often have a difference of one year.
  */
 export const YEAR_TOLERANCE = 1;
 
@@ -31,12 +29,8 @@ export const YEAR_TOLERANCE = 1;
  */
 
 /**
- * Look for an item with this name and both these years, and with no P244.
- * An item that has P244 is left out, because the P244 search already covers
- * it, and a different P244 means a different person.
- *
- * The function never throws. A failure gives the status 'error'.
- *
+ * Find an item with this name, these two years, and no P244.
+ * This function does not throw. A failure gives the status 'error'.
  * @param {{label: string, birth?: {year: number}, death?: {year: number}}} draft
  * @param {{signal?: AbortSignal}} [opts]
  * @returns {Promise<NameMatchResult>}
@@ -46,9 +40,9 @@ export async function findNameMatches(draft, opts = {}) {
   const birth = draft?.birth?.year;
   const death = draft?.death?.year;
 
-  // Both years are necessary. A name and one year is too weak to show anyone.
+  // Both years are necessary. A name and one year are not sufficient evidence.
   if (!label || !Number.isInteger(birth) || !Number.isInteger(death)) {
-    return { status: 'skipped', items: [], detail: 'Needs a name, a birth year and a death year.' };
+    return { status: 'skipped', items: [], detail: 'The check needs a name, a birth year, and a death year.' };
   }
 
   const query = buildQuery(label, birth, death);
@@ -69,10 +63,10 @@ export async function findNameMatches(draft, opts = {}) {
     });
 
     if (res.status === 429) {
-      return { status: 'error', items: [], detail: 'Wikidata rate limit. Check by hand.' };
+      return { status: 'error', items: [], detail: 'Wikidata rate limit. Do the check manually.' };
     }
     if (!res.ok) {
-      return { status: 'error', items: [], detail: `The query service returned ${res.status}.` };
+      return { status: 'error', items: [], detail: `The query service sent error ${res.status}.` };
     }
 
     const data = await res.json();
@@ -86,19 +80,18 @@ export async function findNameMatches(draft, opts = {}) {
       return {
         status: 'error',
         items: [],
-        detail: stopped ? 'Check cancelled.' : 'The query service did not answer in time.',
+        detail: stopped ? 'You cancelled the check.' : 'The query service did not answer in the time limit.',
       };
     }
-    return { status: 'error', items: [], detail: `Could not reach the query service. ${cause.message}` };
+    return { status: 'error', items: [], detail: `Cannot connect to the query service. ${cause.message}` };
   } finally {
     clearTimeout(t);
   }
 }
 
 /**
- * Build the SPARQL query. The label must match exactly, and both years must
- * fall within the tolerance. An item that already has P244 is excluded.
- *
+ * Make the SPARQL query. The label must match exactly and the years must be in tolerance.
+ * Exclude an item that has P244.
  * @param {string} label
  * @param {number} birth
  * @param {number} death
@@ -122,9 +115,8 @@ LIMIT 5`;
 }
 
 /**
- * A SPARQL string literal. Quotes, backslashes and newlines are escaped, so
- * a name cannot end the literal and add to the query.
- *
+ * Make a SPARQL string literal. Escape quotes, backslashes, and line breaks.
+ * Thus a name cannot end the literal and change the query.
  * @param {string} value
  * @returns {string}
  */
@@ -145,7 +137,7 @@ function sparqlString(value) {
 }
 
 /**
- * One result row as an item. A row with no usable item URI gives undefined.
+ * Change one result row into an item. Return undefined if the row has no usable item URI.
  * @param {object} row
  */
 function toItem(row) {
@@ -163,7 +155,7 @@ function toItem(row) {
 }
 
 /**
- * Make one signal that aborts when any given signal aborts.
+ * Make one signal that aborts when one of the given signals aborts.
  * @param {(AbortSignal | undefined)[]} signals
  * @returns {AbortSignal}
  */

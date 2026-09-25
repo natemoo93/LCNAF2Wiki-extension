@@ -557,7 +557,9 @@ function diffLine(change) {
   if (!added) {
     const why =
       change.status === 'same'
-        ? 'already there'
+        ? change.matchLang
+          ? `already there (${change.matchLang})`
+          : 'already there'
         : `kept: ${change.existing || 'existing value'}`;
     line.append(el('span', { class: 'diff-note' }, why));
   }

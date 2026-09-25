@@ -9,7 +9,8 @@
  *   name: string,
  *   status: 'add' | 'kept' | 'same',
  *   value?: string,
- *   existing?: string
+ *   existing?: string,
+ *   matchLang?: string
  * }} FieldChange
  *
  * @typedef {{
@@ -84,17 +85,24 @@ export function diffAgainstItem(draft, item, statements = {}) {
   const existingAliases = item?.aliases?.[lang] ?? [];
   // Record if an alias list exists for this language.
   const hadAliases = existingAliases.length > 0;
-  const known = new Set(existingAliases.map(fold));
-  // Wikidata refuses an alias that is the same as the label.
-  if (existingLabel) known.add(fold(existingLabel));
+  // Compare with the labels and aliases in all languages. Keep the language of each match.
+  // A variant that the item has in a different language must not come back without a language.
+  const known = knownNames(item, lang);
 
   const freshAliases = [];
   for (const alias of draft.aliases ?? []) {
-    if (known.has(fold(alias))) {
-      changes.push({ key: `alias:${alias}`, name: 'Alias', status: 'same', value: alias });
+    const matchLang = known.get(fold(alias));
+    if (matchLang !== undefined) {
+      changes.push({
+        key: `alias:${alias}`,
+        name: 'Alias',
+        status: 'same',
+        value: alias,
+        ...(matchLang === lang ? {} : { matchLang }),
+      });
       continue;
     }
-    known.add(fold(alias));
+    known.set(fold(alias), lang);
     freshAliases.push(alias);
     changes.push({ key: `alias:${alias}`, name: 'Alias', status: 'add', value: alias });
   }
@@ -212,6 +220,32 @@ function readStatementValue(statement) {
   if (content == null) return '';
   // A time value is an object. All values from this tool are strings.
   return typeof content === 'string' ? content : (content.time ?? JSON.stringify(content));
+}
+
+/**
+ * Map each normalized label and alias on the item to its language.
+ * Put the draft language first, so that a match in that language has priority.
+ * @param {object} item
+ * @param {string} lang
+ * @returns {Map<string, string>}
+ */
+function knownNames(item, lang) {
+  const known = new Map();
+  const add = (value, code) => {
+    const key = fold(value);
+    if (key && !known.has(key)) known.set(key, code);
+  };
+
+  // Wikidata refuses an alias that is the same as the label.
+  add(item?.labels?.[lang], lang);
+  for (const alias of item?.aliases?.[lang] ?? []) add(alias, lang);
+
+  for (const [code, label] of Object.entries(item?.labels ?? {})) add(label, code);
+  for (const [code, list] of Object.entries(item?.aliases ?? {})) {
+    for (const alias of list ?? []) add(alias, code);
+  }
+
+  return known;
 }
 
 /** Normalize text for comparison. Ignore case and extra space characters. */

@@ -3,8 +3,14 @@
  * An ind1 of "1" is surname first. An ind1 of "0" is direct order.
  */
 
+/** A comma: the ASCII comma or the Arabic comma (U+060C). LC uses both. */
+const COMMA = /[,،]/;
+
+/** A name in Chinese, Japanese, or Korean characters only, with spaces and name separators. */
+const CJK_ONLY = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\s·・ー]+$/u;
+
 /** A comma or a period that MARC puts at the end as a separator. */
-const TRAILING_PUNCT = /[,.]+\s*$/;
+const TRAILING_PUNCT = /[,،.]+\s*$/;
 
 /**
  * A name with low confidence also has a `direct` value and a reason for a person to examine.
@@ -41,14 +47,16 @@ export function invertName(rawA, opts = {}) {
 
   if (commas === 0) {
     // A single name has no comma. If ind1 shows surname first, report it.
+    // Do not report a CJK name. It has no comma, and it is already in the correct order.
+    const flag = opts.ind1 === '1' && !CJK_ONLY.test(cleaned);
     return {
       direct: cleaned,
-      confidence: opts.ind1 === '1' ? 'low' : 'high',
-      reason: opts.ind1 === '1' ? 'The indicator shows surname first, but the name has no comma.' : undefined,
+      confidence: flag ? 'low' : 'high',
+      reason: flag ? 'The indicator shows surname first, but the name has no comma.' : undefined,
     };
   }
 
-  const pivot = cleaned.indexOf(',');
+  const pivot = cleaned.search(COMMA);
   const surname = cleaned.slice(0, pivot).trim();
   const rest = cleaned.slice(pivot + 1).trim();
   const direct = collapseSpaces(`${rest} ${surname}`);
@@ -97,7 +105,7 @@ export function invertName(rawA, opts = {}) {
  * @returns {string}
  */
 export function stripDates(raw) {
-  return raw.replace(/,?\s*\b\d{4}\??\s*-\s*(\d{4}\??)?\s*$/, '');
+  return raw.replace(/[,،]?\s*\b\d{4}\??\s*-\s*(\d{4}\??)?\s*$/, '');
 }
 
 /**
@@ -107,7 +115,7 @@ export function stripDates(raw) {
  */
 export function stripTrailingPunct(raw) {
   // Remove the comma first. In "Rothschild, Irwin B.," the period is part of the initial.
-  const s = raw.replace(/,\s*$/, '').trim();
+  const s = raw.replace(/[,،]\s*$/, '').trim();
 
   // Keep the period of an initial. Do not change "Sween, Joyce A." to "Joyce A".
   if (/(^|\s)\p{Lu}\.$/u.test(s)) return s;
@@ -132,7 +140,7 @@ function looksLikeEpithet(rest) {
  * @returns {number}
  */
 function countCommas(s) {
-  return (s.match(/,/g) ?? []).length;
+  return (s.match(new RegExp(COMMA, 'g')) ?? []).length;
 }
 
 /**

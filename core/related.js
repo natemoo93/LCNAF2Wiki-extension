@@ -46,7 +46,7 @@ export function extractRelated(rec) {
   const out = [];
 
   for (const f of datafields(rec, '500')) {
-    const heading = (subfield(f, 'a') ?? '').trim().replace(/,$/, '');
+    const heading = (subfield(f, 'a') ?? '').trim().replace(/[,\u060C]$/, '');
     if (!heading) continue;
 
     // Change the heading to direct order for Wikidata.

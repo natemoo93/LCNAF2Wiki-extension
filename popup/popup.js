@@ -15,7 +15,7 @@ import { getSettings } from '../core/settings.js';
 import { getAccessToken, getSession } from '../core/auth.js';
 import { createItem, getItem, patchItem } from '../core/wikibase.js';
 import { buildStatements, summarize } from '../core/statements.js';
-import { buildAddPatch, diffAgainstItem, summarizeAdditions } from '../core/diff.js';
+import { buildAddPatch, diffAgainstItem, summarizeAdditions, withhold } from '../core/diff.js';
 
 /** The address of the documentation link. */
 const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
@@ -223,12 +223,6 @@ function renderDraft(draft, settings = {}) {
   for (const f of fields) {
     const { row, field } = draftRow(f, byField[f.key] ?? []);
     inputs[f.key] = field;
-    // List the excluded romanizations, so that the user can copy one into the field.
-    if (f.key === 'aliases' && draft.excludedAliases?.length) {
-      row.append(
-        el('p', { class: 'draft-note' }, `Excluded romanizations: ${draft.excludedAliases.join('|')}`),
-      );
-    }
     wrap.append(row);
   }
 
@@ -293,6 +287,7 @@ async function currentToken() {
  * @param {HTMLButtonElement} create
  */
 function askToCreate(stage, draft, create) {
+  showRefresh(create);
   const panel = el('div', { class: 'confirm' });
   panel.append(el('p', { class: 'confirm-title' }, 'Save this item to Wikidata?'));
 
@@ -319,12 +314,40 @@ function askToCreate(stage, draft, create) {
       'div',
       { class: 'confirm-actions' },
       go,
-      button_('Cancel', () => stage.replaceChildren()),
+      button_('Cancel', () => closePanel(stage, create)),
     ),
   );
 
   stage.replaceChildren(panel);
-  go.focus();
+}
+
+/**
+ * Change the button label to "Refresh" while its confirm panel is open.
+ * Keep the first label, so that closePanel can restore it.
+ * @param {HTMLButtonElement} button
+ */
+function showRefresh(button) {
+  button.dataset.label ??= button.textContent;
+  button.textContent = 'Refresh';
+}
+
+/**
+ * Restore the label that the button had before its confirm panel opened.
+ * @param {HTMLButtonElement} button
+ */
+function restoreLabel(button) {
+  if (button.dataset.label) button.textContent = button.dataset.label;
+  delete button.dataset.label;
+}
+
+/**
+ * Close the confirm panel and restore the button label.
+ * @param {HTMLElement} stage
+ * @param {HTMLButtonElement} button
+ */
+function closePanel(stage, button) {
+  stage.replaceChildren();
+  restoreLabel(button);
 }
 
 /**
@@ -354,10 +377,12 @@ async function saveItem(stage, draft, create) {
     );
 
     // The item exists now. Disable the button to prevent a duplicate.
+    delete create.dataset.label;
     create.textContent = 'Created ' + item.id;
     create.disabled = true;
   } catch (err) {
     create.disabled = false;
+    restoreLabel(create);
 
     // The sign-in expired after the popup opened. Update the header.
     if (err.code === 'signed-out') {
@@ -482,6 +507,8 @@ async function offerExisting(button, stage, readDraft, found) {
   markAddable(button, stage, {
     ...found,
     diff,
+    item,
+    readDraft,
     lang: draft.lang,
     lcnafId: draft.lcnafId,
   });
@@ -513,13 +540,26 @@ function markAddable(button, stage, found) {
  * @param {HTMLButtonElement} button
  */
 function askToAdd(stage, found, button) {
+  // Compare the current text fields with the item, so that the diff includes edits.
+  const draft = found.readDraft();
+  found = { ...found, diff: diffAgainstItem(draft, found.item, buildStatements(draft)) };
+  showRefresh(button);
+
   const panel = el('div', { class: 'confirm' });
   panel.append(el('p', { class: 'confirm-title' }, `Add to ${found.itemId}?`));
 
   const diffBox = el('div', { class: 'diff' });
 
+  // The keys of the additions that the user unchecked.
+  const withheld = new Set();
+  const onToggle = (key, keep) => {
+    if (keep) withheld.delete(key);
+    else withheld.add(key);
+    go.disabled = !withhold(found.diff, withheld, found.lang).hasAdditions;
+  };
+
   for (const change of found.diff.additions) {
-    diffBox.append(diffLine(change));
+    diffBox.append(diffLine(change, onToggle));
   }
 
   panel.append(diffBox);
@@ -534,26 +574,30 @@ function askToAdd(stage, found, button) {
     ),
   );
 
-  const go = button_('Add', () => addToItem(stage, found, button), 'primary');
+  const go = button_(
+    'Add',
+    () => addToItem(stage, { ...found, diff: withhold(found.diff, withheld, found.lang) }, button),
+    'primary',
+  );
+  go.disabled = !found.diff.hasAdditions;
   panel.append(
     el(
       'div',
       { class: 'confirm-actions' },
       go,
       linkLike('Open item ↗', () => openUrl(found.url)),
-      button_('Cancel', () => stage.replaceChildren()),
+      button_('Cancel', () => closePanel(stage, button)),
     ),
   );
 
   stage.replaceChildren(panel);
-  go.focus();
 }
 
 /**
  * Make one line of the diff. An addition is green with a plus. Other lines are plain.
  * @param {import('../core/diff.js').FieldChange} change
  */
-function diffLine(change) {
+function diffLine(change, onToggle) {
   const added = change.status === 'add';
 
   const line = el('div', { class: added ? 'diff-line diff-add' : 'diff-line diff-keep' });
@@ -570,8 +614,23 @@ function diffLine(change) {
   if (!added) {
     const note = change.matchLang ? `Unchanged (${change.matchLang})` : 'Unchanged';
     line.append(el('span', { class: 'diff-note' }, note));
+    return line;
   }
 
+  // An unchecked addition is withheld. It turns grey and is not in the patch.
+  const box = el('input', {
+    type: 'checkbox',
+    class: 'diff-check',
+    'aria-label': `Add ${change.name}: ${change.value ?? ''}`,
+  });
+  box.checked = true;
+
+  box.addEventListener('change', () => {
+    line.classList.toggle('diff-withheld', !box.checked);
+    onToggle?.(change.key, box.checked);
+  });
+
+  line.append(box);
   return line;
 }
 
@@ -603,10 +662,12 @@ async function addToItem(stage, found, button) {
       ),
     );
 
+    delete button.dataset.label;
     button.textContent = `Added to ${found.itemId}`;
     button.disabled = true;
   } catch (err) {
     button.disabled = false;
+    restoreLabel(button);
 
     if (err.code === 'signed-out') {
       await refreshSession();

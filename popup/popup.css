@@ -214,13 +214,6 @@ main {
   background: var(--warn-bg);
 }
 
-.draft-note {
-  margin: 3px 0 0;
-  font-size: 11px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
 .draft-warn {
   margin: 3px 0 0;
   font-size: 11px;
@@ -658,7 +651,7 @@ footer a:hover {
 
 .diff-line {
   display: grid;
-  grid-template-columns: 14px max-content 1fr;
+  grid-template-columns: 14px max-content 1fr auto;
   gap: 0 8px;
   align-items: baseline;
   padding: 3px 6px;
@@ -678,6 +671,21 @@ footer a:hover {
 .diff-keep {
   background: transparent;
   color: var(--muted);
+}
+
+/* An addition that the user unchecked. */
+.diff-add.diff-withheld {
+  background: transparent;
+  color: var(--muted);
+}
+
+/* The checkbox is at the right end of the first row of the line. */
+.diff-check {
+  grid-column: 4;
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  cursor: pointer;
 }
 
 .diff-mark {

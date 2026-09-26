@@ -7,7 +7,7 @@
  * @typedef {{
  *   key: string,
  *   name: string,
- *   status: 'add' | 'kept' | 'same',
+ *   status: 'add' | 'kept' | 'same' | 'withheld',
  *   value?: string,
  *   existing?: string,
  *   matchLang?: string
@@ -189,6 +189,34 @@ export function buildAddPatch(diff, lang, lcnafId) {
   return {
     patch,
     comment: lcnafId ? `Added from LCNAF ${lcnafId} with LCNAF2Wiki` : 'Added with LCNAF2Wiki',
+  };
+}
+
+/**
+ * Remove the additions that the user withheld. Each key is a FieldChange key.
+ * A withheld line gets the status 'withheld' and is not in the patch.
+ * @param {ItemDiff} diff
+ * @param {Set<string>} keys
+ * @param {string} lang
+ * @returns {ItemDiff}
+ */
+export function withhold(diff, keys, lang) {
+  if (!keys.size) return diff;
+
+  const freshAliases = diff.freshAliases.filter((a) => !keys.has(`alias:${a}`));
+  const additions = diff.additions.map((c) =>
+    c.status === 'add' && keys.has(c.key) ? { ...c, status: 'withheld' } : c,
+  );
+
+  return {
+    ...diff,
+    additions,
+    labels: keys.has('label') ? {} : diff.labels,
+    descriptions: keys.has('description') ? {} : diff.descriptions,
+    aliases: freshAliases.length ? { [lang]: freshAliases } : {},
+    freshAliases,
+    statements: Object.fromEntries(Object.entries(diff.statements).filter(([p]) => !keys.has(p))),
+    hasAdditions: additions.some((c) => c.status === 'add'),
   };
 }
 

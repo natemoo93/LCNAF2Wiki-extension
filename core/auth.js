@@ -22,11 +22,8 @@ const ACCOUNT_KEY = 'oauthAccount';
 export const REGISTER_URL =
   'https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth2';
 
-/**
- * The OAuth client ID of this extension. The ID is public and has no secret.
- * TODO: replace with the Northwestern institutional client when it is registered.
- */
-const DEFAULT_CLIENT_ID = '';
+/** The OAuth client ID of this extension. The ID is public and has no secret. */
+const DEFAULT_CLIENT_ID = '48b59e0ca17d6750316170ef5bb2eb1b';
 
 /** Storage key for a different client ID. Most users leave it empty. */
 const CLIENT_ID_KEY = 'oauthClientId';
@@ -191,6 +188,9 @@ export async function setClientId(value) {
 
 /* ---------- the browser ---------- */
 
+/** The path of the return address. The registered callback URL must end with this path. */
+const REDIRECT_PATH = 'oauth2';
+
 /**
  * Get the return address for the sign-in.
  * The browser makes it from the extension ID, so a website cannot use it.
@@ -198,7 +198,7 @@ export async function setClientId(value) {
  */
 export function getRedirectUri() {
   const api = globalThis.chrome?.identity ?? globalThis.browser?.identity;
-  if (api?.getRedirectURL) return api.getRedirectURL();
+  if (api?.getRedirectURL) return api.getRedirectURL(REDIRECT_PATH);
   throw authError('This browser has no identity API. You cannot sign in.', 'no-identity');
 }
 

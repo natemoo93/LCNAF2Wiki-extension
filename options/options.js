@@ -21,7 +21,6 @@ const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
 /** The page where a user withdraws the permission for this extension. */
 const GRANTS_URL = 'https://meta.wikimedia.org/wiki/Special:OAuthManageMyGrants';
 
-const dupToggle = document.getElementById('check-duplicates');
 const romanizedToggle = document.getElementById('exclude-romanized');
 const saveRadios = document.querySelectorAll('input[name="save-method"]');
 const clientInput = document.getElementById('client-id');
@@ -50,11 +49,6 @@ async function init() {
   }
 
   const settings = await getSettings();
-
-  dupToggle.checked = settings.checkDuplicates;
-  dupToggle.addEventListener('change', () => {
-    setSetting('checkDuplicates', dupToggle.checked);
-  });
 
   romanizedToggle.checked = settings.excludeRomanized;
   romanizedToggle.addEventListener('change', () => {
@@ -124,9 +118,12 @@ async function renderAccount() {
     return;
   }
 
+  // Sign-in is not available until an OAuth 2.0 consumer is approved.
+  const signInButton = button('Sign in to Wikidata', startSignIn, 'primary');
+  signInButton.disabled = true;
   accountState.replaceChildren(
-    note('You are not signed in. Items save with a temporary account.'),
-    actions(button('Sign in to Wikidata', startSignIn, 'primary')),
+    note('OAuth not yet supported. Edits will be anonymous.', 'state-warn'),
+    actions(signInButton),
   );
 }
 

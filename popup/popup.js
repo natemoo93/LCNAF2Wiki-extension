@@ -3,9 +3,9 @@
  * A click on a chip opens or closes its detail.
  */
 
-import { fetchRecord } from '../core/lcClient.js';
+import { fetchRecord, findIdByHeading } from '../core/lcClient.js';
 import { parseMarcXml } from '../core/marc.js';
-import { extractFields, idFromUrl, normalizeId } from '../core/extract.js';
+import { extractFields, headingFromUrl, idFromUrl, normalizeId } from '../core/extract.js';
 import { mapRecord } from '../core/mapper.js';
 import { toQuickStatements } from '../core/quickstatements.js';
 import { newItemUrl } from '../core/newitem.js';
@@ -53,11 +53,7 @@ async function init() {
   // On an LC authority page, get the identifier from the URL and look it up immediately.
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const id = tab?.url ? idFromUrl(tab.url) : undefined;
-    if (id) {
-      input.value = id;
-      lookup(id);
-    }
+    if (tab?.url) lookupUrl(tab.url);
   } catch {
     // chrome.tabs is not available when the popup opens as a usual page.
     // The user can type an identifier.
@@ -66,6 +62,11 @@ async function init() {
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
+  // Accept a pasted id.loc.gov or authorities.loc.gov URL.
+  if (/^https?:\/\//i.test(input.value.trim())) {
+    if (!lookupUrl(input.value.trim())) renderError(new Error('This URL has no LCNAF identifier or heading.'));
+    return;
+  }
   const id = normalizeId(input.value);
   if (!id) {
     input.focus();
@@ -75,6 +76,58 @@ form.addEventListener('submit', (e) => {
   input.value = id;
   lookup(id);
 });
+
+/**
+ * Look up the record for an id.loc.gov or authorities.loc.gov URL.
+ * Return false if the URL has no identifier and no heading.
+ * @param {string} url
+ * @returns {boolean}
+ */
+function lookupUrl(url) {
+  const id = idFromUrl(url);
+  if (id) {
+    input.value = id;
+    lookup(id);
+    return true;
+  }
+
+  const heading = headingFromUrl(url);
+  if (heading) {
+    lookupHeading(heading);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Find the LCCN of a heading, then look up the record.
+ * @param {string} heading
+ */
+async function lookupHeading(heading) {
+  inFlight?.abort();
+  const ctl = new AbortController();
+  inFlight = ctl;
+
+  setBusy(true);
+  out.replaceChildren(el('p', { class: 'loading' }, `Finding the LCNAF identifier for ${heading}…`));
+
+  let id;
+  try {
+    id = await findIdByHeading(heading, { signal: ctl.signal });
+  } catch (err) {
+    if (ctl.signal.aborted || err.name === 'AbortError') return;
+    renderError(err);
+    if (inFlight === ctl) {
+      inFlight = null;
+      setBusy(false);
+    }
+    return;
+  }
+
+  if (ctl.signal.aborted) return;
+  input.value = id;
+  lookup(id);
+}
 
 /**
  * Get, parse, extract, and show a record.
@@ -256,8 +309,8 @@ function renderDraft(draft, settings = {}) {
   );
   wrap.append(actions, stage);
 
-  // The check needs the setting on and an identifier.
-  if (settings.checkDuplicates && draft.lcnafId) {
+  // Always check for duplicates. The check needs an identifier.
+  if (draft.lcnafId) {
     guardCreate(create, draft, stage, () => currentDraft(draft, inputs));
   }
 

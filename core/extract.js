@@ -198,3 +198,23 @@ export function idFromUrl(url) {
   const m = /\/authorities\/names\/([^/.?#]+)/.exec(url);
   return m ? m[1] : undefined;
 }
+
+/**
+ * Get the authorized heading from an authorities.loc.gov record URL.
+ * The URL has no LCCN. Its headingRef parameter has the heading from the search.
+ * @param {string} url
+ * @returns {string | undefined}
+ */
+export function headingFromUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  if (parsed.hostname !== 'authorities.loc.gov' || !parsed.pathname.startsWith('/authority/')) {
+    return undefined;
+  }
+  const heading = parsed.searchParams.get('headingRef')?.trim();
+  return heading || undefined;
+}

@@ -159,6 +159,18 @@ footer a {
   color: #fff;
 }
 
+.btn:disabled,
+.btn:disabled:hover {
+  opacity: 0.45;
+  filter: none;
+  cursor: default;
+}
+
+.btn:not(.btn-primary):disabled:hover {
+  border-color: var(--line, #d7dade);
+  color: inherit;
+}
+
 /* A setting with its control below its text. */
 .setting-block {
   display: block;

@@ -105,7 +105,6 @@ async function renderAccount() {
         }),
         link('Manage permission on Wikimedia', GRANTS_URL),
       ),
-      note('Sign-out removes the token from this computer. The permission stays until you withdraw it.'),
     );
     return;
   }
@@ -118,12 +117,9 @@ async function renderAccount() {
     return;
   }
 
-  // Sign-in is not available until an OAuth 2.0 consumer is approved.
-  const signInButton = button('Sign in to Wikidata', startSignIn, 'primary');
-  signInButton.disabled = true;
   accountState.replaceChildren(
-    note('OAuth not yet supported. Edits will be anonymous.', 'state-warn'),
-    actions(signInButton),
+    note('Sign in to be credited for your edits.'),
+    actions(button('Sign in to Wikidata', startSignIn, 'primary')),
   );
 }
 

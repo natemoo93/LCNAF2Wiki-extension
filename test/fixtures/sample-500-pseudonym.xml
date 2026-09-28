@@ -1,0 +1,91 @@
+<marcxml:record xmlns:mets="http://www.loc.gov/METS/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:marcxml="http://www.loc.gov/MARC21/slim">
+  <marcxml:leader>01878cz  a2200301n  4500</marcxml:leader>
+  <marcxml:controlfield tag="001">n86032613</marcxml:controlfield>
+  <marcxml:controlfield tag="003">DLC</marcxml:controlfield>
+  <marcxml:controlfield tag="005">20250805012126.4</marcxml:controlfield>
+  <marcxml:controlfield tag="008">870122n| azannaabn          |a aaa      </marcxml:controlfield>
+  <marcxml:datafield tag="010" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">n  86032613 </marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="040" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">DLC</marcxml:subfield>
+    <marcxml:subfield code="b">eng</marcxml:subfield>
+    <marcxml:subfield code="e">rda</marcxml:subfield>
+    <marcxml:subfield code="c">DLC</marcxml:subfield>
+    <marcxml:subfield code="d">DLC</marcxml:subfield>
+    <marcxml:subfield code="d">TxU-Mu</marcxml:subfield>
+    <marcxml:subfield code="d">DLC</marcxml:subfield>
+    <marcxml:subfield code="d">NIC-Mu</marcxml:subfield>
+    <marcxml:subfield code="d">IlMpPL</marcxml:subfield>
+    <marcxml:subfield code="d">DLC</marcxml:subfield>
+    <marcxml:subfield code="d">GVaS</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="046" ind1=" " ind2=" ">
+    <marcxml:subfield code="f">1954-08-25</marcxml:subfield>
+    <marcxml:subfield code="2">edtf</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="053" ind1=" " ind2="0">
+    <marcxml:subfield code="a">ML420.C685</marcxml:subfield>
+    <marcxml:subfield code="c">Biography</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="100" ind1="1" ind2=" ">
+    <marcxml:subfield code="a">Costello, Elvis</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="370" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">London (England)</marcxml:subfield>
+    <marcxml:subfield code="2">naf</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="372" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Lyric writing (Popular music)</marcxml:subfield>
+    <marcxml:subfield code="a">Rock music</marcxml:subfield>
+    <marcxml:subfield code="2">lcsh</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="374" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Musicians</marcxml:subfield>
+    <marcxml:subfield code="a">Singers</marcxml:subfield>
+    <marcxml:subfield code="a">Composers</marcxml:subfield>
+    <marcxml:subfield code="2">lcsh</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="377" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">eng</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="400" ind1="1" ind2=" ">
+    <marcxml:subfield code="a">MacManus, D. P. A.</marcxml:subfield>
+    <marcxml:subfield code="q">(Declan Patrick Aloysius)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="400" ind1="1" ind2=" ">
+    <marcxml:subfield code="a">MacManus, Declan Patrick Aloysius</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="500" ind1="1" ind2=" ">
+    <marcxml:subfield code="a">Dynamite, Napoleon</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="500" ind1="0" ind2=" ">
+    <marcxml:subfield code="a">Imposter</marcxml:subfield>
+    <marcxml:subfield code="c">(Musician)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="670" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Parkyn, G. Elvis Costello, c1984:</marcxml:subfield>
+    <marcxml:subfield code="b">t.p. (Elvis Costello)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="670" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">His Spike, c1989:</marcxml:subfield>
+    <marcxml:subfield code="b">t.p. (Elvis Costello) p. 6 (words and music by D.P.A. MacManus)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="670" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Encyc. of rock, 1988</marcxml:subfield>
+    <marcxml:subfield code="b">(Costello, Elvis; b. Declan MacManus; in London, 25 Aug. 1954)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="670" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Wikipedia WWW site, Dec. 9, 2005</marcxml:subfield>
+    <marcxml:subfield code="b">(under Elvis Costello: Declan Patrick Aloysius MacManus, better known by his stage name, Elvis Costello; b. Aug. 25, 1954, London; popular British musician, singer, and songwriter of Irish ancestry)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="670" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Wikipedia WWW site, Feb. 3, 2011</marcxml:subfield>
+    <marcxml:subfield code="b">(under Elvis Costello: Costello adopted the alias Napoleon Dynamite; the pseudonym had previously been used in 1982, when the B-side single "Imperial Bedroom" was credited to Napoleon Dynamite &amp; The Royal Guard; was later appropriated by the 2004 film Napoleon Dynamite)</marcxml:subfield>
+  </marcxml:datafield>
+  <marcxml:datafield tag="670" ind1=" " ind2=" ">
+    <marcxml:subfield code="a">Wikipedia, November 4, 2014</marcxml:subfield>
+    <marcxml:subfield code="b">(Elvis Costello; under the pseudonym The Imposter, Costello released Pills and soap, an attack on the changes in British society brought on by Thatcherism; released to coincide with the run-up to the 1983 UK general election)</marcxml:subfield>
+    <marcxml:subfield code="u">http://en.wikipedia.org/wiki/Elvis_Costello</marcxml:subfield>
+  </marcxml:datafield>
+</marcxml:record>

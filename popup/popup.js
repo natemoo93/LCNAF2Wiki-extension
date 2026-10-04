@@ -14,8 +14,8 @@ import { findNameMatches } from '../core/namematch.js';
 import { getSettings } from '../core/settings.js';
 import { getAccessToken, getSession } from '../core/auth.js';
 import { createItem, getItem, patchItem } from '../core/wikibase.js';
-import { buildStatements, summarize } from '../core/statements.js';
-import { buildAddPatch, diffAgainstItem, summarizeAdditions, withhold } from '../core/diff.js';
+import { buildStatements } from '../core/statements.js';
+import { buildAddPatch, diffAgainstItem, selectedDraft, summarizeAdditions, withhold } from '../core/diff.js';
 
 /** The address of the documentation link. */
 const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
@@ -334,22 +334,71 @@ async function currentToken() {
 }
 
 /**
- * Show the confirm step. Show all the data before the save.
+ * Show the confirm step for a new item. Compare the draft with an empty item, so that each line is an addition.
  * @param {HTMLElement} stage
  * @param {import('../core/mapper.js').WikidataDraft} draft
  * @param {HTMLButtonElement} create
  */
 function askToCreate(stage, draft, create) {
   showRefresh(create);
-  const panel = el('div', { class: 'confirm' });
-  panel.append(el('p', { class: 'confirm-title' }, 'Save this item to Wikidata?'));
+  const lang = draft.lang;
 
-  const rows = el('div', { class: 'confirm-rows' });
-  for (const r of summarize(draft)) {
-    rows.append(el('span', { class: 'confirm-key' }, r.name));
-    rows.append(el('span', { class: 'confirm-value' }, r.value));
+  showDiffPanel(stage, {
+    title: 'Save this item to Wikidata?',
+    diff: diffAgainstItem(draft, {}, buildStatements(draft)),
+    lang,
+    button: create,
+    submitLabel: 'Create item',
+    // Only aliases are optional on a new item.
+    checkable: (c) => c.key.startsWith('alias:'),
+    // Wikidata refuses an item with no label and no description.
+    canSubmit: (d) => Boolean(d.labels[lang] || d.descriptions[lang]),
+    onSubmit: (d) => {
+      const chosen = selectedDraft(draft, d);
+      saveItem(stage, chosen.draft, create, chosen.statements);
+    },
+  });
+}
+
+/**
+ * Show a diff with a checkbox on each checkable addition, and a submit button.
+ * Aliases start unchecked, so the user must select each one.
+ * @param {HTMLElement} stage
+ * @param {{
+ *   title: string,
+ *   diff: import('../core/diff.js').ItemDiff,
+ *   lang: string,
+ *   button: HTMLButtonElement,
+ *   submitLabel: string,
+ *   canSubmit: (diff: import('../core/diff.js').ItemDiff) => boolean,
+ *   onSubmit: (diff: import('../core/diff.js').ItemDiff) => void,
+ *   checkable?: (change: import('../core/diff.js').FieldChange) => boolean,
+ *   extraActions?: HTMLElement[]
+ * }} spec
+ */
+function showDiffPanel(stage, spec) {
+  const { diff, lang } = spec;
+  const panel = el('div', { class: 'confirm' });
+  panel.append(el('p', { class: 'confirm-title' }, spec.title));
+
+  // The keys of the unchecked additions.
+  const withheld = new Set(
+    diff.additions.filter((c) => c.status === 'add' && c.key.startsWith('alias:')).map((c) => c.key),
+  );
+  const selected = () => withhold(diff, withheld, lang);
+
+  const onToggle = (key, keep) => {
+    if (keep) withheld.delete(key);
+    else withheld.add(key);
+    go.disabled = !spec.canSubmit(selected());
+  };
+
+  const diffBox = el('div', { class: 'diff' });
+  const checkable = spec.checkable ?? (() => true);
+  for (const change of diff.additions) {
+    diffBox.append(diffLine(change, checkable(change) ? onToggle : undefined, !withheld.has(change.key)));
   }
-  panel.append(rows);
+  panel.append(diffBox);
 
   panel.append(
     el(
@@ -361,13 +410,15 @@ function askToCreate(stage, draft, create) {
     ),
   );
 
-  const go = button_('Create item', () => saveItem(stage, draft, create), 'primary');
+  const go = button_(spec.submitLabel, () => spec.onSubmit(selected()), 'primary');
+  go.disabled = !spec.canSubmit(selected());
   panel.append(
     el(
       'div',
       { class: 'confirm-actions' },
       go,
-      button_('Cancel', () => closePanel(stage, create)),
+      ...(spec.extraActions ?? []),
+      button_('Cancel', () => closePanel(stage, spec.button)),
     ),
   );
 
@@ -408,15 +459,16 @@ function closePanel(stage, button) {
  * @param {HTMLElement} stage
  * @param {import('../core/mapper.js').WikidataDraft} draft
  * @param {HTMLButtonElement} create
+ * @param {Record<string, object[]>} statements the statements that the user selected
  */
-async function saveItem(stage, draft, create) {
+async function saveItem(stage, draft, create, statements) {
   stage.replaceChildren(el('p', { class: 'loading' }, 'Saving to Wikidata…'));
   create.disabled = true;
 
   try {
     // Use a token if one is available. Wikidata accepts the edit without a token.
     const token = await currentToken();
-    const item = await createItem(draft, { accessToken: token });
+    const item = await createItem(draft, { accessToken: token, statements });
 
     stage.replaceChildren(
       el(
@@ -598,59 +650,37 @@ function askToAdd(stage, found, button) {
   found = { ...found, diff: diffAgainstItem(draft, found.item, buildStatements(draft)) };
   showRefresh(button);
 
-  const panel = el('div', { class: 'confirm' });
-  panel.append(el('p', { class: 'confirm-title' }, `Add to ${found.itemId}?`));
+  showDiffPanel(stage, {
+    title: `Add to ${found.itemId}?`,
+    diff: found.diff,
+    lang: found.lang,
+    button,
+    submitLabel: 'Add',
+    canSubmit: (d) => d.hasAdditions,
+    onSubmit: (d) => addToItem(stage, { ...found, diff: d }, button),
+    extraActions: [linkLike('Open item ↗', () => openUrl(found.url))],
+  });
+}
 
-  const diffBox = el('div', { class: 'diff' });
+/** Labels for the items that this tool writes, to show next to their QIDs. */
+const ITEM_LABELS = { Q5: 'human' };
 
-  // The keys of the additions that the user unchecked.
-  const withheld = new Set();
-  const onToggle = (key, keep) => {
-    if (keep) withheld.delete(key);
-    else withheld.add(key);
-    go.disabled = !withhold(found.diff, withheld, found.lang).hasAdditions;
-  };
-
-  for (const change of found.diff.additions) {
-    diffBox.append(diffLine(change, onToggle));
-  }
-
-  panel.append(diffBox);
-
-  panel.append(
-    el(
-      'p',
-      { class: 'confirm-who' },
-      session.state === 'in'
-        ? `Wikidata will show this edit as ${session.account.username}.`
-        : 'Wikidata will show this edit with a temporary account.',
-    ),
-  );
-
-  const go = button_(
-    'Add',
-    () => addToItem(stage, { ...found, diff: withhold(found.diff, withheld, found.lang) }, button),
-    'primary',
-  );
-  go.disabled = !found.diff.hasAdditions;
-  panel.append(
-    el(
-      'div',
-      { class: 'confirm-actions' },
-      go,
-      linkLike('Open item ↗', () => openUrl(found.url)),
-      button_('Cancel', () => closePanel(stage, button)),
-    ),
-  );
-
-  stage.replaceChildren(panel);
+/**
+ * Add the known label in parentheses after each QID in a statement value.
+ * @param {string} text
+ * @returns {string}
+ */
+function withItemLabels(text) {
+  return String(text ?? '').replace(/\bQ\d+\b/g, (q) => (ITEM_LABELS[q] ? `${q} (${ITEM_LABELS[q]})` : q));
 }
 
 /**
  * Make one line of the diff. An addition is green with a plus. Other lines are plain.
  * @param {import('../core/diff.js').FieldChange} change
+ * @param {(key: string, keep: boolean) => void} [onToggle] without it, the addition has no checkbox
+ * @param {boolean} [checked] the first state of the checkbox of an addition
  */
-function diffLine(change, onToggle) {
+function diffLine(change, onToggle, checked = true) {
   const added = change.status === 'add';
 
   const line = el('div', { class: added ? 'diff-line diff-add' : 'diff-line diff-keep' });
@@ -660,7 +690,9 @@ function diffLine(change, onToggle) {
   // The value column always shows the value that the item will have.
   // For a kept line, that is the item's value, not the record's value.
   const kept = change.status === 'kept';
-  const shown = kept ? change.existing || '(existing value)' : change.value;
+  const raw = kept ? change.existing || '(existing value)' : change.value;
+  // Show a label next to a QID in a statement value.
+  const shown = /^P\d+$/.test(change.key) ? withItemLabels(raw) : raw;
   line.append(el('span', { class: 'diff-value' }, shown ?? ''));
 
   // Mark a line that the tool does not change. Show the language of a match in a different language.
@@ -669,18 +701,20 @@ function diffLine(change, onToggle) {
     line.append(el('span', { class: 'diff-note' }, note));
     return line;
   }
+  if (!onToggle) return line;
 
   // An unchecked addition is withheld. It turns grey and is not in the patch.
   const box = el('input', {
     type: 'checkbox',
     class: 'diff-check',
-    'aria-label': `Add ${change.name}: ${change.value ?? ''}`,
+    'aria-label': `Add ${change.name}: ${shown ?? ''}`,
   });
-  box.checked = true;
+  box.checked = checked;
+  line.classList.toggle('diff-withheld', !checked);
 
   box.addEventListener('change', () => {
     line.classList.toggle('diff-withheld', !box.checked);
-    onToggle?.(change.key, box.checked);
+    onToggle(change.key, box.checked);
   });
 
   line.append(box);

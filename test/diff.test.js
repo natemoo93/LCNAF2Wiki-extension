@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { buildAddPatch, diffAgainstItem, summarizeAdditions, withhold } = await import('../core/diff.js');
+const { buildAddPatch, diffAgainstItem, selectedDraft, summarizeAdditions, withhold } = await import('../core/diff.js');
 const { buildStatements } = await import('../core/statements.js');
 
 /** A draft with all fields filled in. */
@@ -296,4 +296,27 @@ test('withholding every addition leaves nothing to add', () => {
 test('withholding nothing returns the same diff', () => {
   const d = diffAgainstItem(draft(), item(), {});
   assert.equal(withhold(d, new Set(), 'en'), d);
+});
+
+/* ---------- a new item ---------- */
+
+test('every field of a draft is an addition to an empty item', () => {
+  const d = diffAgainstItem(draft(), {}, buildStatements(draft()));
+
+  assert.ok(d.additions.every((c) => c.status === 'add'));
+  assert.deepEqual(
+    d.additions.map((c) => c.key),
+    ['label', 'description', 'alias:Douglas Noel Adams', 'P31', 'P244'],
+  );
+});
+
+test('selectedDraft keeps only the lines that the user did not withhold', () => {
+  const d = diffAgainstItem(draft({ aliases: ['A', 'B'] }), {}, buildStatements(draft()));
+  const w = withhold(d, new Set(['description', 'alias:A', 'P31']), 'en');
+  const { draft: chosen, statements } = selectedDraft(draft(), w);
+
+  assert.equal(chosen.label, 'Douglas Adams');
+  assert.equal(chosen.description, '');
+  assert.deepEqual(chosen.aliases, ['B']);
+  assert.deepEqual(Object.keys(statements), ['P244']);
 });

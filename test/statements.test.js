@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { buildItemBody, buildStatements, summarize, timeValue } = await import(
+const { buildItemBody, buildStatements, timeValue } = await import(
   '../core/statements.js'
 );
 
@@ -107,21 +107,9 @@ test('the aliases are copied, so a later edit cannot change the body', () => {
   assert.deepEqual(body.item.aliases.en, ['Samuel Langhorne Clemens']);
 });
 
-/* ---------- the summary ---------- */
+test('given statements replace the statements from the draft', () => {
+  const only = { P244: buildStatements(draft()).P244 };
+  const body = buildItemBody(draft(), { statements: only });
 
-test('the summary shows what the save will write', () => {
-  const rows = summarize(draft());
-  const names = rows.map((r) => r.name);
-
-  assert.ok(names.includes('Label'));
-  assert.ok(names.includes('LCNAF ID (P244)'));
-  assert.ok(names.includes('Instance of (P31)'));
-});
-
-test('the summary leaves out a field with no value', () => {
-  const rows = summarize(draft({ description: '', aliases: [] }));
-  const names = rows.map((r) => r.name);
-
-  assert.equal(names.includes('Description'), false);
-  assert.equal(names.includes('Aliases'), false);
+  assert.deepEqual(Object.keys(body.item.statements), ['P244']);
 });

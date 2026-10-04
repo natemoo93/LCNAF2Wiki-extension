@@ -578,23 +578,6 @@ footer a:hover {
   color: var(--fg);
 }
 
-.confirm-rows {
-  margin: 0 0 10px;
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 3px 10px;
-  font-size: 11px;
-}
-
-.confirm-key {
-  color: var(--muted);
-}
-
-.confirm-value {
-  color: var(--fg);
-  overflow-wrap: anywhere;
-}
-
 .confirm-who {
   margin: 0 0 10px;
   font-size: 11px;

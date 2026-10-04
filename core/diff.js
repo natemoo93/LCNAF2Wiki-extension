@@ -221,6 +221,26 @@ export function withhold(diff, keys, lang) {
 }
 
 /**
+ * Get the draft and the statements that remain after withheld lines are removed.
+ * Use this to create a new item from a diff against an empty item.
+ * @param {import('./mapper.js').WikidataDraft} draft
+ * @param {ItemDiff} diff
+ * @returns {{draft: import('./mapper.js').WikidataDraft, statements: Record<string, object[]>}}
+ */
+export function selectedDraft(draft, diff) {
+  const lang = draft.lang;
+  return {
+    draft: {
+      ...draft,
+      label: diff.labels[lang] ?? '',
+      description: diff.descriptions[lang] ?? '',
+      aliases: [...diff.freshAliases],
+    },
+    statements: diff.statements,
+  };
+}
+
+/**
  * Make a short summary of the additions for a button or a heading.
  * @param {ItemDiff} diff
  * @returns {string}

@@ -99,7 +99,8 @@ export function timeValue(date) {
  * Make the full request body to create an item.
  * Omit a language that has no value. Do not send empty strings.
  * @param {import('./mapper.js').WikidataDraft} draft
- * @param {{now?: Date}} [opts]
+ * @param {{now?: Date, statements?: Record<string, object[]>}} [opts]
+ *   `statements` replaces the statements from the draft.
  * @returns {{item: object, comment: string}}
  */
 export function buildItemBody(draft, opts = {}) {
@@ -110,7 +111,7 @@ export function buildItemBody(draft, opts = {}) {
   if (draft.description) item.descriptions[lang] = draft.description;
   if (draft.aliases?.length) item.aliases[lang] = [...draft.aliases];
 
-  item.statements = buildStatements(draft, opts);
+  item.statements = opts.statements ?? buildStatements(draft, opts);
 
   return {
     item,
@@ -119,22 +120,4 @@ export function buildItemBody(draft, opts = {}) {
       ? `Created from LCNAF ${draft.lcnafId} with LCNAF2Wiki`
       : 'Created with LCNAF2Wiki',
   };
-}
-
-/**
- * Make a list of the values that a save writes, for the confirm step.
- * @param {import('./mapper.js').WikidataDraft} draft
- * @returns {{name: string, value: string}[]}
- */
-export function summarize(draft) {
-  const rows = [
-    { name: 'Label', value: draft.label },
-    { name: 'Description', value: draft.description },
-    { name: 'Aliases', value: draft.aliases?.join(' | ') },
-    { name: 'Language', value: draft.lang },
-    { name: 'LCNAF ID (P244)', value: draft.lcnafId },
-    { name: 'Instance of (P31)', value: 'human' },
-  ];
-
-  return rows.filter((r) => r.value);
 }

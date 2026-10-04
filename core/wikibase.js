@@ -36,7 +36,7 @@ export async function createItem(draft, opts) {
     throw apiError('An item must have a label or a description.', 'empty-item');
   }
 
-  const body = buildItemBody(draft, { now: opts.now });
+  const body = buildItemBody(draft, { now: opts.now, statements: opts.statements });
   const data = await request('POST', '/entities/items', body, opts);
 
   if (!data?.id) throw apiError('Wikidata saved the item but did not send its ID.', 'no-id');

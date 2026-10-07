@@ -52,7 +52,14 @@ test('handles irregular plurals', () => {
 test('joins several terms into one description', () => {
   assert.equal(
     describeFromOccupations(['Sociologists', 'Sociology teachers']),
-    'sociologist, sociology teacher',
+    'sociologist and sociology teacher',
+  );
+});
+
+test('only the last comma becomes "and"', () => {
+  assert.equal(
+    describeFromOccupations(['Authors', 'Lecturers', 'Humorists']),
+    'author, lecturer and humorist',
   );
 });
 

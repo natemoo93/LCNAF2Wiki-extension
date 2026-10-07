@@ -1,5 +1,5 @@
 /**
- * Extract the 100, 400, 374 and 500 fields with no changes, to show the record.
+ * Extract the fields that this tool reads with no changes, to show the record.
  * mapper.js does the mapping.
  */
 
@@ -11,11 +11,14 @@ export const TAGS = [
   { tag: '100', name: 'Personal name (authorized heading)' },
   { tag: '400', name: 'See-from tracing (variant name)' },
   { tag: '374', name: 'Occupation' },
+  { tag: '370', name: 'Associated place' },
   { tag: '500', name: 'See-also tracing (related identity)' },
+  { tag: '024', name: 'Other standard identifier' },
+  { tag: '053', name: 'LC classification number' },
 ];
 
 /**
- * Extract the 100, 400, 374 and 500 fields from a parsed record.
+ * Extract the fields in TAGS from a parsed record.
  * @param {{id: string, doc: XMLDocument, source: string}} rec
  * @returns {{
  *   id: string,
@@ -127,6 +130,9 @@ function assess(tag, fields, rec) {
 
 const ABSENT_NOTE = {
   374: 'No occupation.',
+  370: 'No associated place.',
+  '024': 'No other identifiers.',
+  '053': 'No classification number.',
   400: 'No variant names.',
   500: 'No related identities.',
 };

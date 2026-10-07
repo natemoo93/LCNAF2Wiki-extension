@@ -24,6 +24,11 @@ export function toQuickStatements(draft) {
 
   lines.push(`LAST\t${P_LC_AUTHORITY}\t${quote(draft.lcnafId)}`);
 
+  // Add the identifiers from 024 and the class numbers from 053.
+  for (const { property, value } of draft.identifiers ?? []) {
+    lines.push(`LAST\t${property}\t${quote(value)}`);
+  }
+
   return lines.join('\n');
 }
 

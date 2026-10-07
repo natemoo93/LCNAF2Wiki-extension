@@ -16,6 +16,7 @@ import { getAccessToken, getSession } from '../core/auth.js';
 import { createItem, getItem, patchItem } from '../core/wikibase.js';
 import { buildStatements } from '../core/statements.js';
 import { buildAddPatch, diffAgainstItem, selectedDraft, summarizeAdditions, withhold } from '../core/diff.js';
+import { P_LC_CLASSIFICATION } from '../core/identifiers.js';
 
 /** The address of the documentation link. */
 const DOCS_URL = 'https://github.com/natemoo93/LCNAF2Wiki-extension';
@@ -311,7 +312,9 @@ function renderDraft(draft, settings = {}) {
 
   // Always check for duplicates. The check needs an identifier.
   if (draft.lcnafId) {
-    guardCreate(create, draft, stage, () => currentDraft(draft, inputs));
+    guardCreate(create, draft, stage, () => currentDraft(draft, inputs), (fn) => {
+      wrap.addEventListener('input', fn);
+    });
   }
 
   return wrap;
@@ -349,8 +352,8 @@ function askToCreate(stage, draft, create) {
     lang,
     button: create,
     submitLabel: 'Create item',
-    // Only aliases are optional on a new item.
-    checkable: (c) => c.key.startsWith('alias:'),
+    // Only aliases and the class number are optional on a new item.
+    checkable: startsUnchecked,
     // Wikidata refuses an item with no label and no description.
     canSubmit: (d) => Boolean(d.labels[lang] || d.descriptions[lang]),
     onSubmit: (d) => {
@@ -362,7 +365,7 @@ function askToCreate(stage, draft, create) {
 
 /**
  * Show a diff with a checkbox on each checkable addition, and a submit button.
- * Aliases start unchecked, so the user must select each one.
+ * Aliases and the class number start unchecked, so the user must select each one.
  * @param {HTMLElement} stage
  * @param {{
  *   title: string,
@@ -383,7 +386,7 @@ function showDiffPanel(stage, spec) {
 
   // The keys of the unchecked additions.
   const withheld = new Set(
-    diff.additions.filter((c) => c.status === 'add' && c.key.startsWith('alias:')).map((c) => c.key),
+    diff.additions.filter((c) => c.status === 'add' && startsUnchecked(c)).map((c) => c.key),
   );
   const selected = () => withhold(diff, withheld, lang);
 
@@ -423,6 +426,15 @@ function showDiffPanel(stage, spec) {
   );
 
   stage.replaceChildren(panel);
+}
+
+/**
+ * Return true for an addition that the user must select: an alias or the LC class number.
+ * @param {import('../core/diff.js').FieldChange} change
+ * @returns {boolean}
+ */
+function startsUnchecked(change) {
+  return change.key.startsWith('alias:') || change.key === P_LC_CLASSIFICATION;
 }
 
 /**
@@ -511,8 +523,11 @@ async function saveItem(stage, draft, create, statements) {
  * Refer to the README for the button states.
  * @param {HTMLButtonElement} button
  * @param {import('../core/mapper.js').WikidataDraft} draft
+ * @param {HTMLElement} stage
+ * @param {() => import('../core/mapper.js').WikidataDraft} readDraft
+ * @param {(fn: () => void) => void} onEdit calls fn after each edit of a field
  */
-async function guardCreate(button, draft, stage, readDraft) {
+async function guardCreate(button, draft, stage, readDraft, onEdit) {
   const lcnafId = draft.lcnafId;
   button.disabled = true;
 
@@ -523,7 +538,7 @@ async function guardCreate(button, draft, stage, readDraft) {
     // The item needs an address. Without an address, unlock the button.
     if (first?.url) {
       const found = result.items.map((i) => i.id).join(', ');
-      await offerExisting(button, stage, readDraft, {
+      await offerExisting(button, stage, readDraft, onEdit, {
         itemId: first.id,
         url: first.url,
         title: found
@@ -542,7 +557,7 @@ async function guardCreate(button, draft, stage, readDraft) {
 
     if (byViaf.status === 'duplicate' && first?.url) {
       const found = byViaf.items.map((i) => i.id).join(', ');
-      await offerExisting(button, stage, readDraft, {
+      await offerExisting(button, stage, readDraft, onEdit, {
         itemId: first.id,
         url: first.url,
         title: `Wikidata has this item as ${found}. VIAF ${draft.viafId} matches.`,
@@ -573,14 +588,15 @@ async function guardCreate(button, draft, stage, readDraft) {
 }
 
 /**
- * Read the item that exists and compare it with the record.
- * If the record has more data, offer to add it. If not, only open the item.
+ * Read the item that exists and change the button to add to it or to open it.
+ * The button compares the text fields with the item again after each edit.
  * @param {HTMLButtonElement} button
  * @param {HTMLElement} stage
  * @param {() => import('../core/mapper.js').WikidataDraft} readDraft
+ * @param {(fn: () => void) => void} onEdit
  * @param {{itemId: string, url: string, title: string}} found
  */
-async function offerExisting(button, stage, readDraft, found) {
+async function offerExisting(button, stage, readDraft, onEdit, found) {
   let item;
   try {
     item = await getItem(found.itemId);
@@ -595,70 +611,80 @@ async function offerExisting(button, stage, readDraft, found) {
     return;
   }
 
-  const draft = readDraft();
-  const diff = diffAgainstItem(draft, item, buildStatements(draft));
-
-  if (!diff.hasAdditions) {
-    markFound(button, {
-      label: 'Entry exists ↗',
-      variant: 'copy-exists',
-      url: found.url,
-      title: `${found.title} This record has nothing to add.`,
-    });
-    return;
-  }
-
-  // The record has data to add. Change the button to add the data.
-  markAddable(button, stage, {
-    ...found,
-    diff,
-    item,
-    readDraft,
-    lang: draft.lang,
-    lcnafId: draft.lcnafId,
-  });
-}
-
-/**
- * Change the button to add data to the item that exists.
- * @param {HTMLButtonElement} button
- * @param {HTMLElement} stage
- * @param {object} found
- */
-function markAddable(button, stage, found) {
-  button.disabled = false;
-  button.textContent = `Add to ${found.itemId}`;
-  button.className = 'copy copy-add';
-  button.title = `${found.title} This record adds ${summarizeAdditions(found.diff)}.`;
-
   // Replace the node to remove the create handler. Thus the button cannot write a duplicate.
   const fresh = button.cloneNode(true);
-  fresh.addEventListener('click', () => askToAdd(stage, found, fresh));
+  delete fresh.dataset.overrideUrl;
   button.replaceWith(fresh);
+  fresh.disabled = false;
+
+  const state = { ...found, item, readDraft };
+  paintExisting(fresh, state);
+  onEdit(() => paintExisting(fresh, state));
+  fresh.addEventListener('click', () => askToAdd(stage, state, fresh));
+
+  // A separate link opens the item, so that the button has one function.
+  fresh.parentElement?.append(linkLike(`Open ${found.itemId} ↗`, () => openUrl(found.url)));
 }
 
 /**
- * Show the confirm step to add to an item.
- * Lines to write are green with a plus. Lines that the item has are grey.
+ * Set the button label from the current text fields and the last copy of the item.
+ * The label is "Add to" if the fields have data to add. If not, it is "Entry exists".
+ * The label shows the state only. The click does the same thing in each state.
+ * @param {HTMLButtonElement} button
+ * @param {object} state
+ */
+function paintExisting(button, state) {
+  // A disabled button is busy or has completed its save. Do not change it.
+  if (button.disabled) return;
+
+  const draft = state.readDraft();
+  const diff = diffAgainstItem(draft, state.item, buildStatements(draft));
+  // No arrow: this button always opens the comparison, not a tab.
+  const label = diff.hasAdditions ? `Add to ${state.itemId}` : 'Entry exists';
+
+  button.className = diff.hasAdditions ? 'copy copy-add' : 'copy copy-exists';
+  button.title = diff.hasAdditions
+    ? `${state.title} This record adds ${summarizeAdditions(diff)}.`
+    : `${state.title} This record has nothing to add.`;
+
+  // An open confirm panel shows "Refresh". Keep the label for closePanel.
+  if (button.dataset.label) button.dataset.label = label;
+  else button.textContent = label;
+}
+
+/**
+ * Show the comparison with the item, and the confirm step if there is data to add.
+ * Read the item and the text fields again on each click.
  * @param {HTMLElement} stage
- * @param {object} found
+ * @param {object} state
  * @param {HTMLButtonElement} button
  */
-function askToAdd(stage, found, button) {
-  // Compare the current text fields with the item, so that the diff includes edits.
-  const draft = found.readDraft();
-  found = { ...found, diff: diffAgainstItem(draft, found.item, buildStatements(draft)) };
+async function askToAdd(stage, state, button) {
+  button.disabled = true;
+  try {
+    state.item = await getItem(state.itemId);
+  } catch {
+    // The item is not readable now. Use the last copy.
+  }
+  button.disabled = false;
+
+  const draft = state.readDraft();
+  const diff = diffAgainstItem(draft, state.item, buildStatements(draft));
+
+  const found = { ...state, diff, lang: draft.lang, lcnafId: draft.lcnafId };
+  paintExisting(button, state);
   showRefresh(button);
 
+  // With nothing to add, the panel shows each line as unchanged and the submit button is disabled.
   showDiffPanel(stage, {
-    title: `Add to ${found.itemId}?`,
-    diff: found.diff,
-    lang: found.lang,
+    title: diff.hasAdditions ? `Add to ${state.itemId}?` : `${state.itemId} has all of this data.`,
+    diff,
+    lang: draft.lang,
     button,
     submitLabel: 'Add',
     canSubmit: (d) => d.hasAdditions,
     onSubmit: (d) => addToItem(stage, { ...found, diff: d }, button),
-    extraActions: [linkLike('Open item ↗', () => openUrl(found.url))],
+    extraActions: [linkLike('Open item ↗', () => openUrl(state.url))],
   });
 }
 
@@ -817,9 +843,17 @@ function draftRow(spec, warnings) {
   line.append(field, copyButton('Copy', () => field.value));
   row.append(line);
 
-  for (const w of warnings) {
-    row.append(el('p', { class: 'draft-warn' }, w.detail ?? w.code));
-  }
+  const notes = warnings.map((w) => ({ w, node: el('p', { class: 'draft-warn' }, w.detail ?? w.code) }));
+  row.append(...notes.map((n) => n.node));
+
+  // Hide a warning about terms when the edited text has none of the terms.
+  field.addEventListener('input', () => {
+    const text = field.value.toLowerCase();
+    for (const { w, node } of notes) {
+      if (w.terms) node.hidden = !w.terms.some((t) => text.includes(t.toLowerCase()));
+    }
+    field.classList.toggle('is-flagged', notes.some((n) => !n.node.hidden));
+  });
 
   return { row, field };
 }

@@ -320,3 +320,18 @@ test('selectedDraft keeps only the lines that the user did not withhold', () => 
   assert.deepEqual(chosen.aliases, ['B']);
   assert.deepEqual(Object.keys(statements), ['P244']);
 });
+
+test('a property with two values shows both, and adds both', () => {
+  const statements = {
+    P1149: [
+      { property: { id: 'P1149' }, value: { type: 'value', content: 'PS3545.I5365' } },
+      { property: { id: 'P1149' }, value: { type: 'value', content: 'ML420.C685' } },
+    ],
+  };
+  const d = diffAgainstItem(draft(), item(), statements);
+  const line = d.additions.find((c) => c.key === 'P1149');
+
+  assert.equal(line.status, 'add');
+  assert.equal(line.value, 'PS3545.I5365, ML420.C685');
+  assert.equal(d.statements.P1149.length, 2);
+});

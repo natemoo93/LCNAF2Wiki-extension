@@ -7,7 +7,7 @@ import { cleanFilters } from './filters.js';
 
 /** The default value of each setting. */
 export const DEFAULTS = {
-  excludeRomanized: true,
+  excludeRomanized: false,
   saveMethod: 'api',
   textFilters: [],
 };

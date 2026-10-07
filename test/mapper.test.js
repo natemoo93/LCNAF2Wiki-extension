@@ -21,7 +21,7 @@ test('maps a full record to label, aliases and description', () => {
   const d = mapRecord(fixture);
   assert.equal(d.label, 'Joyce A. Sween');
   assert.deepEqual(d.aliases, ['J. Sween', 'Joyce Sween', 'Joyce Ann Sween']);
-  assert.equal(d.description, 'sociologist, sociology teacher');
+  assert.equal(d.description, 'American sociologist and sociology teacher');
   assert.equal(d.descriptionSource, 'occupation');
   assert.equal(d.lang, DEFAULT_LANG);
   assert.equal(d.lcnafId, 'no2012063640');
@@ -82,7 +82,7 @@ test('an occupation and a date go in the same description', () => {
     </marcxml:datafield>`);
 
   const d = mapRecord(rec);
-  assert.equal(d.description, 'author, lecturer, humorist (1835-1910)');
+  assert.equal(d.description, 'author, lecturer and humorist (1835-1910)');
   assert.equal(d.descriptionSource, 'occupation+dates');
 });
 
@@ -195,7 +195,7 @@ test('QuickStatements emits terms and the P244 provenance statement', () => {
 
   assert.equal(lines[0], 'CREATE');
   assert.ok(lines.includes('LAST\tLen\t"Joyce A. Sween"'));
-  assert.ok(lines.includes('LAST\tDen\t"sociologist, sociology teacher"'));
+  assert.ok(lines.includes('LAST\tDen\t"American sociologist and sociology teacher"'));
   assert.ok(lines.includes('LAST\tAen\t"Joyce Ann Sween"'));
   assert.ok(lines.includes('LAST\tP244\t"no2012063640"'));
 });
@@ -264,6 +264,62 @@ test('a text filter is applied to the occupations', () => {
 
 test('a record maps the same when there are no filters', () => {
   assert.deepEqual(mapRecord(fixture, { textFilters: [] }), mapRecord(fixture));
+});
+
+test('an LCSH syntax warning lists its terms as they are in the description', () => {
+  const draft = mapRecord(record(`
+    <marcxml:datafield tag="100" ind1="1" ind2=" ">
+      <marcxml:subfield code="a">Hale, George</marcxml:subfield>
+    </marcxml:datafield>
+    <marcxml:datafield tag="374" ind1=" " ind2=" ">
+      <marcxml:subfield code="a">Authors</marcxml:subfield>
+      <marcxml:subfield code="a">Mali--Officials and employees</marcxml:subfield>
+    </marcxml:datafield>`));
+  const warning = draft.warnings.find((w) => w.code === 'lcsh-syntax');
+
+  assert.ok(warning.terms.length > 0);
+  for (const term of warning.terms) assert.ok(draft.description.includes(term), term);
+});
+
+/* ---------- associated country ---------- */
+
+/** Make a record with an occupation and the given 370 $c values. */
+const withCountries = (countries, occupation = true) =>
+  record(`
+    <marcxml:datafield tag="100" ind1="1" ind2=" ">
+      <marcxml:subfield code="a">Hale, George</marcxml:subfield>
+    </marcxml:datafield>
+    <marcxml:datafield tag="370" ind1=" " ind2=" ">
+      <marcxml:subfield code="a">Bamako (Mali)</marcxml:subfield>
+      ${countries.map((c) => `<marcxml:subfield code="c">${c}</marcxml:subfield>`).join('')}
+    </marcxml:datafield>
+    ${
+      occupation
+        ? `<marcxml:datafield tag="374" ind1=" " ind2=" ">
+             <marcxml:subfield code="a">Authors</marcxml:subfield>
+             <marcxml:subfield code="a">Novelists</marcxml:subfield>
+           </marcxml:datafield>`
+        : ''
+    }`);
+
+test('the associated country goes before the occupations as an adjective', () => {
+  assert.equal(mapRecord(withCountries(['Mali'])).description, 'Malian author and novelist');
+});
+
+test('a birthplace alone gives no country adjective', () => {
+  assert.equal(mapRecord(withCountries([])).description, 'author and novelist');
+});
+
+test('more than one associated country gives no adjective', () => {
+  assert.equal(mapRecord(withCountries(['Mali', 'France'])).description, 'author and novelist');
+});
+
+test('a country that is not in the table gives no adjective', () => {
+  assert.equal(mapRecord(withCountries(['Guangzhou Shi (China)'])).description, 'author and novelist');
+});
+
+test('a country with no occupation gives no description', () => {
+  assert.equal(mapRecord(withCountries(['Mali'], false)).description, '');
 });
 
 /* ---------- romanizations ---------- */

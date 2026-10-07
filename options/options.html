@@ -18,50 +18,6 @@
         <div id="account-state" class="account-state">
           <p class="setting-note">Reading the sign-in state…</p>
         </div>
-
-        <details class="advanced">
-          <summary>Advanced</summary>
-
-          <div class="setting setting-block">
-            <span class="setting-text">
-              <span class="setting-name">Text filters</span>
-              <span class="setting-note">
-                Use a filter for a character that LC does not send correctly, or
-                for text that you always change.
-              </span>      
-              <div id="filters" class="filters"></div>
-
-              <button type="button" id="add-filter" class="btn btn-add">
-                + Add a filter
-              </button>
-            </span>
-          </div>
-
-          <div class="setting setting-block">
-            <span class="setting-text">
-              <span class="setting-name">OAuth client</span>
-              <span class="setting-note">                
-                Enter a client ID only to sign in with a different client.
-              </span>
-              <input
-                type="text"
-                id="client-id"
-                class="text-input"
-                placeholder="(the built-in client)"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <span class="setting-note">
-                Callback address:
-                <code id="redirect-uri" class="redirect">(this browser does not give an address)</code>
-                <a id="register" href="#" target="_blank" rel="noreferrer">Register a client</a> as non-owner-only and non-confidential, with the
-                <strong>Create, edit, and move pages</strong> grant.
-                
-              </span>
-            </span>
-          </div>
-        </details>
-
       </section>
 
       <section class="group">
@@ -105,6 +61,49 @@
             </span>
           </span>
         </label>
+      </section>
+
+      <section class="group">
+        <h2>Advanced</h2>
+
+        <div class="setting setting-block">
+          <span class="setting-text">
+            <span class="setting-name">Text filters</span>
+            <span class="setting-note">
+              Use a filter for a character that LC does not send correctly, or
+              for text that you always change.
+            </span>      
+            <div id="filters" class="filters"></div>
+
+            <button type="button" id="add-filter" class="btn btn-add">
+              + Add a filter
+            </button>
+          </span>
+        </div>
+
+        <div class="setting setting-block">
+          <span class="setting-text">
+            <span class="setting-name">OAuth client</span>
+            <span class="setting-note">                
+              Enter a client ID only to sign in with a different client.
+            </span>
+            <input
+              type="text"
+              id="client-id"
+              class="text-input"
+              placeholder="(the built-in client)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <span class="setting-note">
+              Callback address:
+              <code id="redirect-uri" class="redirect">(this browser does not give an address)</code>
+              <a id="register" href="#" target="_blank" rel="noreferrer">Register a client</a> as non-owner-only and non-confidential, with the
+              <strong>Create, edit, and move pages</strong> grant.
+              
+            </span>
+          </span>
+        </div>
       </section>
 
     </main>

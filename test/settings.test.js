@@ -44,10 +44,10 @@ test('an excludeRomanized value that is not a boolean gets the default', async (
   assert.equal((await getSettings()).excludeRomanized, DEFAULTS.excludeRomanized);
 });
 
-test('a stored false stays false', async () => {
-  // The default is true, so the check must keep a false value.
-  stubStorage({ excludeRomanized: false });
-  assert.equal((await getSettings()).excludeRomanized, false);
+test('a stored true stays true', async () => {
+  // The default is false, so the check must keep a true value.
+  stubStorage({ excludeRomanized: true });
+  assert.equal((await getSettings()).excludeRomanized, true);
 });
 
 test('an old checkDuplicates value in storage is ignored', async () => {
@@ -102,7 +102,7 @@ test('text filters come back from the store', async () => {
   stubStorage({ textFilters: [{ replace: 'a', with: 'b' }] });
   const settings = await getSettings();
 
-  assert.deepEqual(settings.textFilters, [{ replace: 'a', with: 'b' }]);
+  assert.deepEqual(settings.textFilters, [{ replace: 'a', with: 'b', enabled: true }]);
 });
 
 test('a damaged filter list does not stop the settings loading', async () => {

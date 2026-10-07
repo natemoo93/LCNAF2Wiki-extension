@@ -64,6 +64,18 @@ test('a non-Latin string is replaced like any other', () => {
   assert.equal(out, 'Douglas');
 });
 
+test('a filter that is off is not applied', () => {
+  assert.equal(applyFilters('abc', [{ replace: 'a', with: 'X', enabled: false }]), 'abc');
+});
+
+test('a filter that is off does not stop the filters after it', () => {
+  const out = applyFilters('ab', [
+    { replace: 'a', with: 'X', enabled: false },
+    { replace: 'b', with: 'Y', enabled: true },
+  ]);
+  assert.equal(out, 'aY');
+});
+
 /* ---------- cleaning ---------- */
 
 test('a filter with no left side is dropped', () => {
@@ -71,13 +83,22 @@ test('a filter with no left side is dropped', () => {
 });
 
 test('a missing right side becomes an empty string', () => {
-  assert.deepEqual(cleanFilters([{ replace: 'X' }]), [{ replace: 'X', with: '' }]);
+  assert.deepEqual(cleanFilters([{ replace: 'X' }]), [{ replace: 'X', with: '', enabled: true }]);
 });
 
 test('anything that is not a filter is dropped', () => {
   assert.deepEqual(cleanFilters([null, 'x', 7, { replace: 'a', with: 'b' }]), [
-    { replace: 'a', with: 'b' },
+    { replace: 'a', with: 'b', enabled: true },
   ]);
+});
+
+test('a filter with no enabled value is on', () => {
+  // A filter from an older version has no enabled value.
+  assert.equal(cleanFilters([{ replace: 'a', with: 'b' }])[0].enabled, true);
+});
+
+test('a filter that is off stays off', () => {
+  assert.equal(cleanFilters([{ replace: 'a', with: 'b', enabled: false }])[0].enabled, false);
 });
 
 test('a stored value that is not a list gives no filters', () => {

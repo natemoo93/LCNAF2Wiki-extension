@@ -31,7 +31,7 @@ const addFilterButton = document.getElementById('add-filter');
 
 /**
  * The filters on the page. Write them to storage after each change.
- * @type {{replace: string, with: string}[]}
+ * @type {import('../core/filters.js').TextFilter[]}
  */
 let filters = [];
 
@@ -66,7 +66,7 @@ async function init() {
   renderFilters();
 
   addFilterButton.addEventListener('click', () => {
-    filters.push({ replace: '', with: '' });
+    filters.push({ replace: '', with: '', enabled: true });
     renderFilters();
     // Put the cursor in the new row.
     filterList.querySelector('.filter-row:last-child .filter-from')?.focus();
@@ -158,13 +158,27 @@ function renderFilters() {
 }
 
 /**
- * Make one filter row: the text to replace, the new text, and a remove button.
- * @param {{replace: string, with: string}} filter
+ * Make one filter row: a switch, the text to replace, the new text, and a remove button.
+ * @param {import('../core/filters.js').TextFilter} filter
  * @param {number} index
  */
 function filterRow(filter, index) {
   const row = document.createElement('div');
   row.className = 'filter-row';
+
+  const toggle = document.createElement('input');
+  toggle.type = 'checkbox';
+  toggle.className = 'filter-toggle';
+  toggle.setAttribute('role', 'switch');
+  toggle.checked = filter.enabled !== false;
+  toggle.title = 'Use this filter';
+  toggle.setAttribute('aria-label', `Use filter ${index + 1}`);
+  row.classList.toggle('filter-off', !toggle.checked);
+  toggle.addEventListener('change', () => {
+    filters[index].enabled = toggle.checked;
+    row.classList.toggle('filter-off', !toggle.checked);
+    saveFilters();
+  });
 
   const from = filterInput('replace:', filter.replace, 'filter-from', (value) => {
     filters[index].replace = value;
@@ -188,7 +202,7 @@ function filterRow(filter, index) {
     saveFilters();
   });
 
-  row.append(from, to, remove);
+  row.append(toggle, from, to, remove);
   return row;
 }
 

@@ -10,11 +10,12 @@ export const MAX_FILTERS = 50;
 export const MAX_FILTER_LENGTH = 200;
 
 /**
- * @typedef {{replace: string, with: string}} TextFilter
+ * A filter with no `enabled` value is on.
+ * @typedef {{replace: string, with: string, enabled?: boolean}} TextFilter
  */
 
 /**
- * Apply each filter to one value, in sequence.
+ * Apply each filter that is on to one value, in sequence.
  * Skip a filter with an empty `replace`, because it matches between all characters.
  * @param {string} value
  * @param {TextFilter[]} filters
@@ -28,6 +29,7 @@ export function applyFilters(value, filters) {
   for (const filter of filters) {
     const from = filter?.replace;
     if (typeof from !== 'string' || from === '') continue;
+    if (filter.enabled === false) continue;
 
     const to = typeof filter.with === 'string' ? filter.with : '';
     out = out.split(from).join(to);
@@ -58,6 +60,8 @@ export function cleanFilters(filters) {
     out.push({
       replace: from.slice(0, MAX_FILTER_LENGTH),
       with: to.slice(0, MAX_FILTER_LENGTH),
+      // A filter from an older version has no value, so it stays on.
+      enabled: filter.enabled !== false,
     });
 
     if (out.length >= MAX_FILTERS) break;

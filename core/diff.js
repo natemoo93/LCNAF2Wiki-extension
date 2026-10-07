@@ -29,6 +29,11 @@
 const STATEMENT_NAMES = {
   P244: 'LCNAF ID (P244)',
   P31: 'Instance of (P31)',
+  P214: 'VIAF ID (P214)',
+  P213: 'ISNI (P213)',
+  P496: 'ORCID iD (P496)',
+  P227: 'GND ID (P227)',
+  P1149: 'LC Classification (P1149)',
 };
 
 /**
@@ -116,7 +121,9 @@ export function diffAgainstItem(draft, item, statements = {}) {
   for (const [property, list] of Object.entries(statements)) {
     const name = STATEMENT_NAMES[property] ?? property;
     const held = item?.statements?.[property] ?? [];
-    const value = readStatementValue(list[0]);
+    // A property can have more than one value, for example two class numbers.
+    const values = list.map(readStatementValue);
+    const value = values.join(', ');
 
     if (held.length === 0) {
       newStatements[property] = list;
@@ -124,11 +131,12 @@ export function diffAgainstItem(draft, item, statements = {}) {
       continue;
     }
 
-    const existing = held.map(readStatementValue).filter(Boolean).join(', ');
+    const heldValues = held.map(readStatementValue).filter(Boolean);
+    const existing = heldValues.join(', ');
     changes.push({
       key: property,
       name,
-      status: held.some((s) => readStatementValue(s) === value) ? 'same' : 'kept',
+      status: values.every((v) => heldValues.includes(v)) ? 'same' : 'kept',
       value,
       existing,
     });

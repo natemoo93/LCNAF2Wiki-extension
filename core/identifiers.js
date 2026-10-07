@@ -1,5 +1,5 @@
 /**
- * Get the external identifiers from the 024 field.
+ * Get the external identifiers from the 024 field and the class numbers from the 053 field.
  * The VIAF number finds duplicates that have no P244.
  */
 
@@ -11,7 +11,26 @@ import { datafields, subfield, indicators } from './marc.js';
  */
 export const SOURCES = {
   viaf: { property: 'P214', name: 'VIAF' },
+  isni: { property: 'P213', name: 'ISNI' },
+  orcid: { property: 'P496', name: 'ORCID' },
+  gnd: { property: 'P227', name: 'GND' },
   wikidata: { property: null, name: 'Wikidata' },
+};
+
+/** The Wikidata property for the Library of Congress Classification. */
+export const P_LC_CLASSIFICATION = 'P1149';
+
+/**
+ * The format that Wikidata accepts for each property.
+ * Do not send a value that does not match.
+ */
+const FORMATS = {
+  P214: /^[1-9]\d(\d{0,7}|\d{17,20})$/,
+  P213: /^0{7}\d{8}[\dX]$/,
+  P496: /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/,
+  P227: /^(1[01234]?\d{7}[\dX]|[47]\d{6}-\d|[1-9]\d{0,7}-[\dX]|3\d{7}[\dX])$/,
+  P1149:
+    /^[A-Z]{1,3}(\d+(\.\d+)?( *\.[A-Z]{0,3}\d+([ -]\.?[A-Z]{0,3}\d+)?)?( *\d+[a-z]*)?)?-?([A-Z]{1,3}(\d+(\.\d+)?( *\.[A-Z]{0,3}\d+([ -]\.?[A-Z]{0,3}\d+)?)?( *\d+[a-z]*)?)?)?$/,
 };
 
 /**
@@ -47,6 +66,49 @@ export function extractIdentifiers(rec) {
   }
 
   return out;
+}
+
+/**
+ * Get the identifiers and class numbers to write as statements.
+ * Each value has the form that Wikidata accepts. Other values are left out.
+ * @param {object} rec
+ * @returns {{property: string, value: string}[]}
+ */
+export function statementIds(rec) {
+  const found = extractIdentifiers(rec)
+    .filter((i) => i.property)
+    .map((i) => ({ property: i.property, value: normalizeId(i.source, i.value) }));
+
+  for (const f of datafields(rec, '053')) {
+    const start = (subfield(f, 'a') ?? '').trim();
+    const end = (subfield(f, 'b') ?? '').trim();
+    // $b is the end of a range of class numbers.
+    found.push({ property: P_LC_CLASSIFICATION, value: end ? `${start}-${end}` : start });
+  }
+
+  const out = [];
+  const seen = new Set();
+  for (const { property, value } of found) {
+    const key = `${property}:${value}`;
+    if (!value || seen.has(key) || !FORMATS[property].test(value)) continue;
+    seen.add(key);
+    out.push({ property, value });
+  }
+  return out;
+}
+
+/**
+ * Change an 024 value to the form that Wikidata uses.
+ * Remove an address before the value. Remove the spaces from an ISNI.
+ * @param {string} source
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeId(source, value) {
+  if (source === 'viaf') return normalizeViaf(value) ?? '';
+
+  const bare = value.trim().replace(/^https?:\/\/\S+\//i, '');
+  return source === 'isni' ? bare.replace(/\s+/g, '').toUpperCase() : bare;
 }
 
 /**

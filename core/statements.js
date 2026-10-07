@@ -1,6 +1,6 @@
 /**
  * Make Wikibase statements from a draft.
- * Write only the LCNAF identifier and "instance of: human".
+ * Write the LCNAF identifier, "instance of: human", and the identifiers from 024 and 053.
  */
 
 /** The Wikidata property for the Library of Congress authority ID. */
@@ -51,6 +51,15 @@ export function buildStatements(draft, opts = {}) {
         references: [reference(opts.now ?? new Date())],
       },
     ];
+  }
+
+  // Add each identifier and class number from the record, with the same reference.
+  for (const { property, value } of draft.identifiers ?? []) {
+    (statements[property] ??= []).push({
+      property: { id: property },
+      value: { type: 'value', content: value },
+      references: [reference(opts.now ?? new Date())],
+    });
   }
 
   return statements;

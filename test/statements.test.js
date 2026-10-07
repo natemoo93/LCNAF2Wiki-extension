@@ -113,3 +113,25 @@ test('given statements replace the statements from the draft', () => {
 
   assert.deepEqual(Object.keys(body.item.statements), ['P244']);
 });
+
+/* ---------- the identifiers from 024 and 053 ---------- */
+
+test('each identifier of the draft is a statement with the reference', () => {
+  const s = buildStatements(
+    draft({
+      identifiers: [
+        { property: 'P214', value: '113230702' },
+        { property: 'P1149', value: 'PS3545.I5365' },
+        { property: 'P1149', value: 'ML420.C685' },
+      ],
+    }),
+  );
+
+  assert.equal(s.P214[0].value.content, '113230702');
+  assert.deepEqual(s.P1149.map((x) => x.value.content), ['PS3545.I5365', 'ML420.C685']);
+  assert.equal(s.P214[0].references[0].parts[0].property.id, 'P248');
+});
+
+test('a draft with no identifiers writes only P31 and P244', () => {
+  assert.deepEqual(Object.keys(buildStatements(draft())), ['P31', 'P244']);
+});

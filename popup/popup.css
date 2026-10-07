@@ -232,7 +232,7 @@ main {
   cursor: pointer;
 }
 
-.copy:hover {
+.copy:enabled:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -254,7 +254,7 @@ main {
   color: #fff;
 }
 
-.copy-primary:hover {
+.copy-primary:enabled:hover {
   color: #fff;
   opacity: 0.9;
 }
@@ -497,7 +497,7 @@ footer a:hover {
   color: var(--info-fg);
 }
 
-.copy-exists:hover {
+.copy-exists:enabled:hover {
   border-color: var(--info-fg);
   color: var(--info-fg);
 }
@@ -511,7 +511,7 @@ footer a:hover {
   color: var(--info-fg);
 }
 
-.copy-possible:hover {
+.copy-possible:enabled:hover {
   border-color: var(--info-fg);
   color: var(--info-fg);
 }
@@ -702,6 +702,6 @@ footer a:hover {
   color: var(--ok-fg);
 }
 
-.copy-add:hover {
+.copy-add:enabled:hover {
   border-color: var(--ok-fg);
 }

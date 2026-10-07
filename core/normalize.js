@@ -119,6 +119,7 @@ export function isAwkwardTerm(raw) {
 
 /**
  * Make a description from the occupation terms, in lowercase with commas.
+ * The word "and" replaces the last comma.
  * @param {string[]} terms
  * @returns {string}
  */
@@ -134,5 +135,6 @@ export function describeFromOccupations(terms) {
       out.push(n);
     }
   }
-  return out.join(', ');
+  if (out.length < 2) return out.join('');
+  return `${out.slice(0, -1).join(', ')} and ${out.at(-1)}`;
 }

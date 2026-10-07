@@ -16,7 +16,7 @@ const ITEM_URL = 'https://www.wikidata.org/wiki/';
 
 /** Identify the extension to Wikimedia, as the policy tells. */
 export const USER_AGENT =
-  'LCNAF2Wiki/0.1 (Northwestern University Library; https://github.com/natemoo93/LCNAF2Wiki-extension)';
+  'LCNAF2Wiki/0.2.1 (Northwestern University Library; https://github.com/natemoo93/LCNAF2Wiki-extension)';
 
 /** The maximum wait. A slow API must not lock the button. */
 const TIMEOUT_MS = 6000;

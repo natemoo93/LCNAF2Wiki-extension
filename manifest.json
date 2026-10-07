@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LCNAF2Wiki",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Turns an LCNAF authority record into a Wikidata item.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAndN9VAFvzoqezZgyyAYwQieHTI5Rmej/EoNPmp77Qg8EXXclDDcZoE9gP480uacIKDLaV5B+Rf5kaT3oO1pBLQYJOabC9kM0Ni4T6q+w+EvguSFOnKsIHFbJIgVaSAzN5SLEN6lHhCekTe2f8+nCWqQ6AJHlZ9dAuds5B/eL0UFVN1BZ79CQ1GGzn5p+HWCpU5LtdrdPiNGhEt+d8MT5xp2f7pQ5Qd2CtiwphOAY+7HtQs8+lvIlihjFQiX/P5+JkjbYdGjhnaZx6C7WI2VYEbEI0+WmUnCX1ghMIxPDvPGdzFMO0It/yOzzCWcvLgm9JGdx3y7zVwacqfxqht2G9wIDAQAB",
   "permissions": ["activeTab", "storage", "identity"],

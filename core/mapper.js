@@ -7,18 +7,20 @@ import { datafields, subfields, subfield, indicators } from './marc.js';
 import { invertName, looksRomanized } from './names.js';
 import { describeFromOccupations, isAwkwardTerm, normalizeOccupation } from './normalize.js';
 import { extractDates, formatDateParens, PRIVACY_BIRTH_YEAR } from './dates.js';
-import { viafId, wikidataId } from './identifiers.js';
+import { statementIds, viafId, wikidataId } from './identifiers.js';
 import { applyFilters } from './filters.js';
+import { demonymFor } from './demonyms.js';
 
 /** The default language. */
 export const DEFAULT_LANG = 'en';
 
 /**
- * @typedef {{code: string, field?: string, detail?: string}} Warning
+ * @typedef {{code: string, field?: string, detail?: string, terms?: string[]}} Warning
  * @typedef {{
  *   lcnafId: string,
  *   viafId?: string,
  *   wikidataId?: string,
+ *   identifiers?: {property: string, value: string}[],
  *   lang: string,
  *   label: string,
  *   aliases: string[],
@@ -54,6 +56,8 @@ export function mapRecord(rec, opts = {}) {
     // These come from 024. Most records do not have them.
     viafId: viafId(rec),
     wikidataId: wikidataId(rec),
+    // These come from 024 and 053. They go to Wikidata as statements.
+    identifiers: statementIds(rec),
     lang: DEFAULT_LANG,
     label,
     aliases,
@@ -164,7 +168,7 @@ function buildAliases(rec, label, warnings, filters = [], excludeRomanized = fal
 }
 
 /**
- * Make the description from the occupations and the years in parentheses.
+ * Make the description from the country adjective, the occupations, and the years in parentheses.
  * Each part is optional. Refer to the README for the privacy rule.
  * @param {object} rec
  * @param {Warning[]} warnings
@@ -177,12 +181,14 @@ function buildDescription(rec, warnings, filters = []) {
   const occupations = terms.length ? describeFromOccupations(terms) : '';
 
   if (terms.length) {
-    const awkward = terms.filter(isAwkwardTerm);
+    const awkward = terms.filter(isAwkwardTerm).map(normalizeOccupation);
     if (awkward.length) {
       warnings.push({
         code: 'lcsh-syntax',
         field: '374$a',
-        detail: `These terms keep LCSH syntax: ${awkward.map(normalizeOccupation).join(', ')}.`,
+        detail: `These terms keep LCSH syntax: ${awkward.join(', ')}.`,
+        // The popup removes the warning when the description has none of these terms.
+        terms: awkward,
       });
     }
   }
@@ -190,8 +196,11 @@ function buildDescription(rec, warnings, filters = []) {
   const { birth, death } = extractDates(rec);
   const years = formatDateParens(birth, death);
 
-  // One space separates the two parts.
-  const description = [occupations, years].filter(Boolean).join(' ');
+  // A country adjective needs an occupation to describe.
+  const nationality = occupations ? countryAdjective(rec, filters) : '';
+
+  // One space separates the parts.
+  const description = [nationality, occupations, years].filter(Boolean).join(' ');
 
   if (description) {
     return {
@@ -212,6 +221,23 @@ function buildDescription(rec, warnings, filters = []) {
   }
 
   return { description: '', descriptionSource: 'none' };
+}
+
+/**
+ * Get the adjective for the associated country in 370 $c, for example "Malian".
+ * Return an empty string if the record does not give exactly one known country.
+ * @param {object} rec
+ * @param {import('./filters.js').TextFilter[]} filters
+ * @returns {string}
+ */
+function countryAdjective(rec, filters = []) {
+  const countries = datafields(rec, '370').flatMap((f) => subfields(f, 'c'));
+  if (countries.length === 0) return '';
+
+  const adjectives = new Set(countries.map((c) => demonymFor(applyFilters(c, filters))));
+  // An unknown country is undefined in the set, so it also prevents a result.
+  const [only] = adjectives;
+  return adjectives.size === 1 && only ? only : '';
 }
 
 /**

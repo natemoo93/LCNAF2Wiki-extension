@@ -45,7 +45,7 @@ test('extractFields groups the read tags with counts', () => {
   assert.equal(out.heading, 'Sween, Joyce A.');
   const counts = Object.fromEntries(out.groups.map((g) => [g.tag, g.fields.length]));
   // This record has no 500, so that group is empty.
-  assert.deepEqual(counts, { 100: 1, 400: 3, 374: 1, 500: 0 });
+  assert.deepEqual(counts, { 100: 1, 400: 3, 374: 1, 370: 1, 500: 0, '024': 0, '053': 0 });
 });
 
 test('each group carries a status driving its chip colour', () => {

@@ -22,8 +22,11 @@ const ACCOUNT_KEY = 'oauthAccount';
 export const REGISTER_URL =
   'https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth2';
 
-/** The OAuth client ID of this extension. The ID is public and has no secret. */
-const DEFAULT_CLIENT_ID = 'b3cc168f7ec05538efb4842b4a6fe290';
+/** The OAuth client ID for Chromium browsers. The ID is public and has no secret. */
+const CHROMIUM_CLIENT_ID = 'b3cc168f7ec05538efb4842b4a6fe290';
+
+/** The OAuth client ID for Firefox. Firefox has a different callback URL, so it needs its own client. */
+const FIREFOX_CLIENT_ID = '';
 
 /** Storage key for a different client ID. Most users leave it empty. */
 const CLIENT_ID_KEY = 'oauthClientId';
@@ -159,15 +162,20 @@ export async function getClientId() {
   const stored = await readLocal(CLIENT_ID_KEY);
   const override = typeof stored === 'string' ? stored.trim() : '';
   // A stored ID replaces the built-in ID.
-  return override || DEFAULT_CLIENT_ID;
+  return override || getBuiltInClientId();
 }
 
 /**
- * Get the built-in client ID. Ignore a stored ID.
+ * Get the built-in client ID for this browser. Ignore a stored ID.
  * @returns {string}
  */
 export function getBuiltInClientId() {
-  return DEFAULT_CLIENT_ID;
+  return isFirefox() ? FIREFOX_CLIENT_ID : CHROMIUM_CLIENT_ID;
+}
+
+/** Return true if the extension runs in Firefox. */
+function isFirefox() {
+  return Boolean(globalThis.chrome?.runtime?.getURL?.('').startsWith('moz-extension://'));
 }
 
 /**
@@ -180,7 +188,7 @@ export async function setClientId(value) {
   const current = await getClientId();
 
   // An empty value removes the stored ID and uses the built-in ID.
-  if (next === current || (!next && current === DEFAULT_CLIENT_ID)) return;
+  if (next === current || (!next && current === getBuiltInClientId())) return;
 
   await writeLocal(CLIENT_ID_KEY, next);
   await signOut();

@@ -138,6 +138,26 @@ test('red chips do carry a message, because the reason is not on the MARC line',
   assert.match(g.messages[0], /check the position in direct order/i);
 });
 
+test('a $c that is only a qualifier in parentheses does not change the chip colour', () => {
+  const qualified = parseMarcXml(
+    `<marcxml:record xmlns:marcxml="${MARCXML_NS}">
+       <marcxml:datafield tag="100" ind1="0" ind2=" ">
+         <marcxml:subfield code="a">Pat the Bunny</marcxml:subfield>
+         <marcxml:subfield code="c">(Musician),</marcxml:subfield>
+       </marcxml:datafield>
+       <marcxml:datafield tag="400" ind1="1" ind2=" ">
+         <marcxml:subfield code="a">Schneeweis, Patrick</marcxml:subfield>
+         <marcxml:subfield code="c">(Musician),</marcxml:subfield>
+       </marcxml:datafield>
+     </marcxml:record>`,
+    'no2022049974',
+  );
+  const byTag = Object.fromEntries(extractFields(qualified).groups.map((g) => [g.tag, g]));
+  assert.equal(byTag['100'].status, 'present');
+  assert.deepEqual(byTag['100'].messages, []);
+  assert.equal(byTag['400'].status, 'present');
+});
+
 test('non-MARCXML response throws rather than silently yielding nothing', () => {
   // LC sends an HTML error page for some identifiers.
   // A well-formed document is not proof of a record.

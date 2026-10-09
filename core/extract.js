@@ -5,6 +5,7 @@
 
 import { datafields, subfields, subfield, allSubfields, indicators, controlfield } from './marc.js';
 import { extractRelated, relatedAsText } from './related.js';
+import { hasTitleWords } from './names.js';
 
 /** The MARC tags that this tool reads, with labels for the UI. */
 export const TAGS = [
@@ -78,7 +79,7 @@ function assess(tag, fields, rec) {
         messages.push(`The record has ${fields.length} 100 fields.`);
       }
       for (const f of fields) {
-        if (f.titleWords) {
+        if (hasTitleWords(f.titleWords)) {
           // A person must decide the position of a title.
           // Examples: "Sir John Smith" and "Irwin B. Rothschild III".
           attention = true;
@@ -101,7 +102,7 @@ function assess(tag, fields, rec) {
   }
 
   if (tag === '400') {
-    const withTitle = fields.some((f) => f.titleWords);
+    const withTitle = fields.some((f) => hasTitleWords(f.titleWords));
     const withFuller = fields.some((f) => f.fullerForm);
     if (withTitle || withFuller) {
       notable = true;

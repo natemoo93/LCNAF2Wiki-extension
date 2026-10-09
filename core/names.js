@@ -87,7 +87,7 @@ export function invertName(rawA, opts = {}) {
     };
   }
 
-  if (opts.titleWords && !PAREN_QUALIFIER.test(opts.titleWords)) {
+  if (hasTitleWords(opts.titleWords)) {
     // The position of $c is not clear. Return the base name with low confidence.
     // Examples: "Sir John Smith" and "Irwin B. Rothschild III".
     return {
@@ -100,6 +100,15 @@ export function invertName(rawA, opts = {}) {
   }
 
   return { direct, surname, forename: rest, confidence: 'high' };
+}
+
+/**
+ * Return true if $c has words that a person must put in position, such as "Sir" or "III".
+ * @param {string | undefined} titleWords the value of subfield $c
+ * @returns {boolean}
+ */
+export function hasTitleWords(titleWords) {
+  return Boolean(titleWords) && !PAREN_QUALIFIER.test(titleWords);
 }
 
 /**

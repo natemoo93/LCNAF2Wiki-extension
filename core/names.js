@@ -12,6 +12,9 @@ const CJK_ONLY = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Scrip
 /** A comma or a period that MARC puts at the end as a separator. */
 const TRAILING_PUNCT = /[,،.]+\s*$/;
 
+/** A $c that is only a qualifier in parentheses, such as "(Musician),". It is not part of the name. */
+const PAREN_QUALIFIER = /^\s*\([^()]*\)[,،.]*\s*$/;
+
 /**
  * A name with low confidence also has a `direct` value and a reason for a person to examine.
  * @typedef {'high' | 'low'} Confidence
@@ -84,7 +87,7 @@ export function invertName(rawA, opts = {}) {
     };
   }
 
-  if (opts.titleWords) {
+  if (opts.titleWords && !PAREN_QUALIFIER.test(opts.titleWords)) {
     // The position of $c is not clear. Return the base name with low confidence.
     // Examples: "Sir John Smith" and "Irwin B. Rothschild III".
     return {

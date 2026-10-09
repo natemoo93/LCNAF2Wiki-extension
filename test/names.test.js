@@ -56,6 +56,13 @@ test('does not place a $c title automatically', () => {
   assert.match(parsed.reason, /in position manually/i);
 });
 
+test('ignores a $c that is only a qualifier in parentheses', () => {
+  const parsed = invertName('Schneeweis, Patrick', { ind1: '1', titleWords: '(Musician),' });
+  assert.equal(parsed.direct, 'Patrick Schneeweis');
+  assert.equal(parsed.confidence, 'high');
+  assert.equal(invertName('Smith, John', { ind1: '1', titleWords: 'Sir (Musician),' }).confidence, 'low');
+});
+
 test('flags a surname-first heading with no comma', () => {
   const parsed = invertName('Cher', { ind1: '1' });
   assert.equal(parsed.direct, 'Cher');
